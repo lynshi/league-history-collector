@@ -26,7 +26,7 @@ class NFLConfiguration(Configuration):
         """Build an NFLConfiguration object from JSON data."""
 
         dict_config = Configuration._get_dict_config(filename=filename, dict_config=dict_config)
-        dict_config = {**dict_config, **{dict_config["nfl"]}}
+        dict_config = {**dict_config, **dict_config["nfl"]}
         del dict_config["nfl"]
 
         # pylint: disable=no-member
