@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/lynshi/league-history-collector/branch/main/graph/badge.svg?token=G65K6F476C)](https://codecov.io/gh/lynshi/league-history-collector) ![Build](https://github.com/lynshi/league-history-collector/workflows/Build/badge.svg) 
+[![codecov](https://codecov.io/gh/lynshi/league-history-collector/branch/main/graph/badge.svg?token=G65K6F476C)](https://codecov.io/gh/lynshi/league-history-collector) ![Build](https://github.com/lynshi/league-history-collector/workflows/Build/badge.svg)
 
 # league-history-collector
 Collects fantasy league data.
