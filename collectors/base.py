@@ -27,7 +27,9 @@ class Configuration:
         be configured with the arguments; for example, `filename` dictates the JSON be
         read from the specified filename."""
 
-        dict_config = Configuration._get_dict_config(filename=filename, dict_config=dict_config)
+        dict_config = Configuration._get_dict_config(
+            filename=filename, dict_config=dict_config
+        )
 
         # pylint/pyright don't understand that the following `from_dict` function comes from the
         # annotations. It doesn't seem like their comments can be combined.
@@ -36,7 +38,9 @@ class Configuration:
         return Configuration.from_dict(dict_config)  # type: ignore
 
     @staticmethod
-    def _get_dict_config(filename: Optional[str] = None, dict_config: Optional[dict] = None) -> dict:
+    def _get_dict_config(
+        filename: Optional[str] = None, dict_config: Optional[dict] = None
+    ) -> dict:
         args = [filename, dict_config]
         num_not_none = len(args) - args.count(None)
         if num_not_none != 1:
@@ -48,14 +52,12 @@ class Configuration:
             with open(filename) as infile:
                 dict_config = json.load(infile)
 
+        assert dict_config is not None  # pacify static type checker
         return dict_config
 
 
-class Collector(ABC):  # pylint: disable=too-few-public-methods
+class ICollector(ABC):  # pylint: disable=too-few-public-methods
     """Abstract base class for collecting data."""
-
-    def __init__(self, config: Configuration):  # pragma: no cover
-        self._config = config
 
     @abstractmethod
     def save_all_data(self):
