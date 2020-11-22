@@ -38,18 +38,21 @@ def test_init():
     config = NFLConfiguration.load(dict_config=dict_config)
 
     driver_mock = MagicMock()
-    time_between_pages = 5
+    time_between_pages_range = (3, 5)
 
     with patch("time.time") as time_mock:
         time_mock.return_value = 42
-        collector = NFLCollector(config, driver_mock, time_between_pages)
+        collector = NFLCollector(config, driver_mock, time_between_pages_range)
 
     assert collector._config == config
     assert collector._driver == driver_mock
-    assert collector._time_between_pages == time_between_pages
+    assert collector._time_between_pages_range == time_between_pages_range
 
     time_mock.assert_called_once()
-    assert collector._last_action_time == time_mock.return_value - time_between_pages
+    assert (
+        collector._last_page_load_time
+        == time_mock.return_value - time_between_pages_range[1]
+    )
 
 
 @pytest.fixture(name="nfl_collector")
@@ -77,11 +80,11 @@ def test_change_page_no_sleep(nfl_collector: NFLCollector):
     def _callable(first, second: Optional[str] = None):
         return f"{first} {second}"
 
-    nfl_collector._last_action_time = 0
+    nfl_collector._last_page_load_time = 0
     with patch("time.time") as time_mock:
         time_mock.side_effect = [
-            nfl_collector._time_between_pages + 1,
-            nfl_collector._time_between_pages + 2,
+            nfl_collector._time_between_pages_range[1] + 1,
+            nfl_collector._time_between_pages_range[1] + 2,
         ]
 
         with patch("time.sleep") as sleep_mock:
@@ -93,7 +96,45 @@ def test_change_page_no_sleep(nfl_collector: NFLCollector):
     time_mock.assert_has_calls([call()] * 2)
     sleep_mock.assert_called_once_with(0)
 
-    assert nfl_collector._last_action_time == nfl_collector._time_between_pages + 2
+    assert (
+        nfl_collector._last_page_load_time
+        == nfl_collector._time_between_pages_range[1] + 2
+    )
+
+
+def test_change_page_with_sleep(nfl_collector: NFLCollector):
+    def _callable(first, second: Optional[str] = None):
+        return f"{first} {second}"
+
+    last_page_load_time = 2
+    current_time = 3
+    interval = 5
+    change_page_time = interval + 1
+
+    nfl_collector._last_page_load_time = last_page_load_time
+    with patch("random.uniform") as uniform_mock:
+        uniform_mock.return_value = interval
+
+        with patch("time.time") as time_mock:
+            time_mock.side_effect = [
+                current_time,
+                change_page_time,
+            ]
+
+            with patch("time.sleep") as sleep_mock:
+                assert (
+                    nfl_collector._change_page(_callable, "first", second="second")
+                    == "first second"
+                )
+
+    uniform_mock.assert_called_once_with(
+        nfl_collector._time_between_pages_range[0],
+        nfl_collector._time_between_pages_range[1],
+    )
+    time_mock.assert_has_calls([call()] * 2)
+    sleep_mock.assert_called_once_with(interval - (current_time - last_page_load_time))
+
+    assert nfl_collector._last_page_load_time == change_page_time
 
 
 def test_login(nfl_collector: NFLCollector):
@@ -194,7 +235,7 @@ def test_login(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(3)
+    sleep_mock.assert_called_once_with(1)
 
 
 def test_login_no_login_button(nfl_collector: NFLCollector):
@@ -385,4 +426,4 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(3)
+    sleep_mock.assert_called_once_with(1)

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
+import random
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 from dataclasses_json import dataclass_json, LetterCase
 from loguru import logger
@@ -42,7 +43,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self,
         config: NFLConfiguration,
         driver: webdriver.Remote,
-        time_between_pages: int = 3,
+        time_between_pages_range: Tuple[int, int] = (2, 4),
     ):
         """Create an NFLCollector.
 
@@ -51,16 +52,17 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 A driver may be created with
                 `webdriver.Remote(command_executor="http://localhost:4444/wd/hub",
                                   desired_capabilities=DesiredCapabilities.CHROME)`.
-            time_between_pages: The minimum amount of time to wait between page changes.
+            time_between_pages_range: When changing pages, wait for a period of time, in seconds,
+                uniformly randomly selected from within this range (inclusive).
         """
 
         self._config = config
 
         self._driver = driver
-        self._time_between_pages = time_between_pages
+        self._time_between_pages_range = time_between_pages_range
 
         # Subtract so first action can occur immediately
-        self._last_action_time = time.time() - self._time_between_pages
+        self._last_page_load_time = time.time() - self._time_between_pages_range[1]
 
     def save_all_data(self):
         """Save all league data."""
@@ -68,9 +70,12 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self._login()
 
     def _change_page(self, action: Callable[..., Any], *args, **kwargs) -> Any:
-        interval = self._time_between_pages
-        time.sleep(max(0, (interval - (time.time() - self._last_action_time))))
-        self._last_action_time = time.time()
+        interval = random.uniform(
+            self._time_between_pages_range[0], self._time_between_pages_range[1]
+        )
+
+        time.sleep(max(0, (interval - (time.time() - self._last_page_load_time))))
+        self._last_page_load_time = time.time()
 
         return action(*args, **kwargs)
 
@@ -111,7 +116,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        time.sleep(3)  # wait for redirect
+        time.sleep(1)  # wait for redirect
         league_url = f"https://fantasy.nfl.com/league/{self._config.league_id}"
         if league_url != self._driver.current_url:
             msg = f"Expected to be on page {league_url}, but on {self._driver.current_url} instead"
