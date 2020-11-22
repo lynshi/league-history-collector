@@ -88,18 +88,24 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self._act(1, username.send_keys, self._config.username)
         self._act(1, password.send_keys, self._config.password)
 
-        login_button = None
+        button_found = False
         input_submit_class_elements = self._driver.find_elements_by_class_name(
             "gigya-input-submit"
         )
-        for element in input_submit_class_elements:
-            if element.text == "Sign In" and element.get_attribute("type") == "submit":
-                login_button = element
+
+        for login_button in input_submit_class_elements:
+            element_value = login_button.get_attribute("value")
+            element_type = login_button.get_attribute("type")
+            logger.debug(
+                f"Potential login button has text {element_value} and type {element_type}"
+            )
+
+            if element_value == "Sign In" and element_type == "submit":
+                self._act(self._time_between_actions, login_button.click)
+                button_found = True
                 break
 
-        if login_button is not None:
-            self._act(1, login_button.click)
-        else:
+        if not button_found:
             msg = "Could not find login button"
             logger.error(msg)
             raise RuntimeError(msg)

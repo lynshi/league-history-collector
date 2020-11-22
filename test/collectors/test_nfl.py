@@ -112,11 +112,38 @@ def test_login(nfl_collector: NFLCollector):
         password_element_mock,
     ]
 
-    fake_button0_mock.text = "not Sign In"
-    fake_button1_mock.text = "Sign In"
-    fake_button1_mock.get_attribute.return_value = "not submit"
-    real_button_mock.text = "Sign In"
-    real_button_mock.get_attribute.return_value = "submit"
+    def _side_effect_0(arg: str) -> str:
+        if arg == "value":
+            return "not Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button0_mock.get_attribute.side_effect = _side_effect_0
+
+    def _side_effect_1(arg: str) -> str:
+        if arg == "value":
+            return "Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button1_mock.get_attribute.side_effect = _side_effect_1
+
+    def _side_effect_2(arg: str) -> str:
+        if arg == "value":
+            return "Sign In"
+
+        if arg == "type":
+            return "submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    real_button_mock.get_attribute.side_effect = _side_effect_2
 
     nfl_collector._driver.find_elements_by_class_name.return_value = [
         fake_button0_mock,
@@ -161,10 +188,12 @@ def test_login(nfl_collector: NFLCollector):
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
         "gigya-input-submit"
     )
-    fake_button1_mock.get_attribute.assert_called_once_with("type")
-    real_button_mock.get_attribute.assert_called_once_with("type")
+    fake_button1_mock.get_attribute.assert_has_calls([call("value"), call("type")])
+    real_button_mock.get_attribute.assert_has_calls([call("value"), call("type")])
 
-    nfl_collector._act.assert_any_call(1, real_button_mock.click)
+    nfl_collector._act.assert_any_call(
+        nfl_collector._time_between_actions, real_button_mock.click
+    )
 
     sleep_mock.assert_called_once_with(3)
 
@@ -186,9 +215,27 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
         password_element_mock,
     ]
 
-    fake_button0_mock.text = "not Sign In"
-    fake_button1_mock.text = "Sign In"
-    fake_button1_mock.get_attribute.return_value = "not submit"
+    def _side_effect_0(arg: str) -> str:
+        if arg == "value":
+            return "not Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button0_mock.get_attribute.side_effect = _side_effect_0
+
+    def _side_effect_1(arg: str) -> str:
+        if arg == "value":
+            return "Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button1_mock.get_attribute.side_effect = _side_effect_1
 
     nfl_collector._driver.find_elements_by_class_name.return_value = [
         fake_button0_mock,
@@ -232,7 +279,7 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
         "gigya-input-submit"
     )
-    fake_button1_mock.get_attribute.assert_called_once_with("type")
+    fake_button1_mock.get_attribute.assert_has_calls([call("value"), call("type")])
 
 
 def test_login_unmatched_url(nfl_collector: NFLCollector):
@@ -253,11 +300,38 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
         password_element_mock,
     ]
 
-    fake_button0_mock.text = "not Sign In"
-    fake_button1_mock.text = "Sign In"
-    fake_button1_mock.get_attribute.return_value = "not submit"
-    real_button_mock.text = "Sign In"
-    real_button_mock.get_attribute.return_value = "submit"
+    def _side_effect_0(arg: str) -> str:
+        if arg == "value":
+            return "not Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button0_mock.get_attribute.side_effect = _side_effect_0
+
+    def _side_effect_1(arg: str) -> str:
+        if arg == "value":
+            return "Sign In"
+
+        if arg == "type":
+            return "not submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    fake_button1_mock.get_attribute.side_effect = _side_effect_1
+
+    def _side_effect_2(arg: str) -> str:
+        if arg == "value":
+            return "Sign In"
+
+        if arg == "type":
+            return "submit"
+
+        raise ValueError(f"Unexpected argument {arg}")
+
+    real_button_mock.get_attribute.side_effect = _side_effect_2
 
     nfl_collector._driver.find_elements_by_class_name.return_value = [
         fake_button0_mock,
@@ -309,9 +383,11 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
         "gigya-input-submit"
     )
-    fake_button1_mock.get_attribute.assert_called_once_with("type")
-    real_button_mock.get_attribute.assert_called_once_with("type")
+    fake_button1_mock.get_attribute.assert_has_calls([call("value"), call("type")])
+    real_button_mock.get_attribute.assert_has_calls([call("value"), call("type")])
 
-    nfl_collector._act.assert_any_call(1, real_button_mock.click)
+    nfl_collector._act.assert_any_call(
+        nfl_collector._time_between_actions, real_button_mock.click
+    )
 
     sleep_mock.assert_called_once_with(3)
