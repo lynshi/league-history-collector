@@ -38,18 +38,18 @@ def test_init():
     config = NFLConfiguration.load(dict_config=dict_config)
 
     driver_mock = MagicMock()
-    time_between_actions = 5
+    time_between_pages = 5
 
     with patch("time.time") as time_mock:
         time_mock.return_value = 42
-        collector = NFLCollector(config, driver_mock, time_between_actions)
+        collector = NFLCollector(config, driver_mock, time_between_pages)
 
     assert collector._config == config
     assert collector._driver == driver_mock
-    assert collector._time_between_actions == time_between_actions
+    assert collector._time_between_pages == time_between_pages
 
     time_mock.assert_called_once()
-    assert collector._last_action_time == time_mock.return_value - time_between_actions
+    assert collector._last_action_time == time_mock.return_value - time_between_pages
 
 
 @pytest.fixture(name="nfl_collector")
@@ -73,29 +73,31 @@ def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login.assert_called_once()
 
 
-def test_act_no_sleep(nfl_collector: NFLCollector):
+def test_change_page_no_sleep(nfl_collector: NFLCollector):
     def _callable(first, second: Optional[str] = None):
         return f"{first} {second}"
 
     nfl_collector._last_action_time = 0
-    interval = 2
     with patch("time.time") as time_mock:
-        time_mock.side_effect = [interval + 1, interval + 2]
+        time_mock.side_effect = [
+            nfl_collector._time_between_pages + 1,
+            nfl_collector._time_between_pages + 2,
+        ]
 
         with patch("time.sleep") as sleep_mock:
             assert (
-                nfl_collector._act(interval, _callable, "first", second="second")
+                nfl_collector._change_page(_callable, "first", second="second")
                 == "first second"
             )
 
     time_mock.assert_has_calls([call()] * 2)
     sleep_mock.assert_called_once_with(0)
 
-    assert nfl_collector._last_action_time == interval + 2
+    assert nfl_collector._last_action_time == nfl_collector._time_between_pages + 2
 
 
 def test_login(nfl_collector: NFLCollector):
-    nfl_collector._act = MagicMock()
+    nfl_collector._change_page = MagicMock()
 
     login_form_mock = MagicMock()
 
@@ -164,8 +166,7 @@ def test_login(nfl_collector: NFLCollector):
         f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
     )
 
-    nfl_collector._act.assert_any_call(
-        nfl_collector._time_between_actions,
+    nfl_collector._change_page.assert_any_call(
         nfl_collector._driver.get,
         expected_login_url,
     )
@@ -178,11 +179,11 @@ def test_login(nfl_collector: NFLCollector):
         ]
     )
 
-    nfl_collector._act.assert_any_call(
-        1, username_element_mock.send_keys, nfl_collector._config.username
+    username_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.username
     )
-    nfl_collector._act.assert_any_call(
-        1, password_element_mock.send_keys, nfl_collector._config.password
+    password_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.password
     )
 
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
@@ -191,15 +192,13 @@ def test_login(nfl_collector: NFLCollector):
     fake_button1_mock.get_attribute.assert_has_calls([call("value"), call("type")])
     real_button_mock.get_attribute.assert_has_calls([call("value"), call("type")])
 
-    nfl_collector._act.assert_any_call(
-        nfl_collector._time_between_actions, real_button_mock.click
-    )
+    nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
     sleep_mock.assert_called_once_with(3)
 
 
 def test_login_no_login_button(nfl_collector: NFLCollector):
-    nfl_collector._act = MagicMock()
+    nfl_collector._change_page = MagicMock()
 
     login_form_mock = MagicMock()
 
@@ -255,8 +254,7 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
         f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
     )
 
-    nfl_collector._act.assert_any_call(
-        nfl_collector._time_between_actions,
+    nfl_collector._change_page.assert_any_call(
         nfl_collector._driver.get,
         expected_login_url,
     )
@@ -269,11 +267,11 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
         ]
     )
 
-    nfl_collector._act.assert_any_call(
-        1, username_element_mock.send_keys, nfl_collector._config.username
+    username_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.username
     )
-    nfl_collector._act.assert_any_call(
-        1, password_element_mock.send_keys, nfl_collector._config.password
+    password_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.password
     )
 
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
@@ -283,7 +281,7 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
 
 
 def test_login_unmatched_url(nfl_collector: NFLCollector):
-    nfl_collector._act = MagicMock()
+    nfl_collector._change_page = MagicMock()
 
     login_form_mock = MagicMock()
 
@@ -359,8 +357,7 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
         f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
     )
 
-    nfl_collector._act.assert_any_call(
-        nfl_collector._time_between_actions,
+    nfl_collector._change_page.assert_any_call(
         nfl_collector._driver.get,
         expected_login_url,
     )
@@ -373,11 +370,11 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
         ]
     )
 
-    nfl_collector._act.assert_any_call(
-        1, username_element_mock.send_keys, nfl_collector._config.username
+    username_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.username
     )
-    nfl_collector._act.assert_any_call(
-        1, password_element_mock.send_keys, nfl_collector._config.password
+    password_element_mock.send_keys.assert_called_once_with(
+        nfl_collector._config.password
     )
 
     nfl_collector._driver.find_elements_by_class_name.assert_called_once_with(
@@ -386,8 +383,6 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
     fake_button1_mock.get_attribute.assert_has_calls([call("value"), call("type")])
     real_button_mock.get_attribute.assert_has_calls([call("value"), call("type")])
 
-    nfl_collector._act.assert_any_call(
-        nfl_collector._time_between_actions, real_button_mock.click
-    )
+    nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
     sleep_mock.assert_called_once_with(3)

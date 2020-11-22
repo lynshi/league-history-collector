@@ -42,7 +42,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self,
         config: NFLConfiguration,
         driver: webdriver.Remote,
-        time_between_actions: int = 3,
+        time_between_pages: int = 3,
     ):
         """Create an NFLCollector.
 
@@ -51,23 +51,24 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 A driver may be created with
                 `webdriver.Remote(command_executor="http://localhost:4444/wd/hub",
                                   desired_capabilities=DesiredCapabilities.CHROME)`.
-            time_between_actions: The minimum amount of time to wait between browser interactions.
+            time_between_pages: The minimum amount of time to wait between page changes.
         """
 
         self._config = config
 
         self._driver = driver
-        self._time_between_actions = time_between_actions
+        self._time_between_pages = time_between_pages
 
         # Subtract so first action can occur immediately
-        self._last_action_time = time.time() - self._time_between_actions
+        self._last_action_time = time.time() - self._time_between_pages
 
     def save_all_data(self):
         """Save all league data."""
 
         self._login()
 
-    def _act(self, interval: int, action: Callable[..., Any], *args, **kwargs) -> Any:
+    def _change_page(self, action: Callable[..., Any], *args, **kwargs) -> Any:
+        interval = self._time_between_pages
         time.sleep(max(0, (interval - (time.time() - self._last_action_time))))
         self._last_action_time = time.time()
 
@@ -79,14 +80,14 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{self._config.league_id}"
         )
         logger.info(f"Logging in to league at {login_url}")
-        self._act(self._time_between_actions, self._driver.get, login_url)
+        self._change_page(self._driver.get, login_url)
 
         login_form = self._driver.find_element_by_id("gigya-login-form")
         username = login_form.find_element_by_id("gigya-loginID-60062076330815260")
         password = login_form.find_element_by_id("gigya-password-85118380969228590")
 
-        self._act(1, username.send_keys, self._config.username)
-        self._act(1, password.send_keys, self._config.password)
+        username.send_keys(self._config.username)
+        password.send_keys(self._config.password)
 
         button_found = False
         input_submit_class_elements = self._driver.find_elements_by_class_name(
@@ -101,7 +102,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             )
 
             if element_value == "Sign In" and element_type == "submit":
-                self._act(self._time_between_actions, login_button.click)
+                self._change_page(login_button.click)
                 button_found = True
                 break
 
