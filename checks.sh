@@ -3,7 +3,7 @@
 # Change these parameter values for your project.
 MAIN=""
 PACKAGES="collectors"
-MINIMUM_CODE_COVERAGE=41
+MINIMUM_CODE_COVERAGE=100
 UNIT_TEST_DIRECTORY="test"
 
 # For coloring terminal output.
