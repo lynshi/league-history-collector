@@ -4,15 +4,30 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import json
-from typing import Optional
+from typing import ClassVar, Dict, Optional
 
-from dataclasses_json import dataclass_json, LetterCase
+from dataclasses_json import DataClassJsonMixin, LetterCase
+from dataclasses_json.cfg import config as dataclass_config
+from stringcase import camelcase
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
+# Use camelcase when providing `letter_case` to dataclass_json to pacify type checker,
+# but assert equivalence for sanity.
+assert camelcase is LetterCase.CAMEL
+
+
+# Inherit from DataClassJsonMixin as type checker doesn't get functions dataclass_json
+# provides.
 @dataclass
-class Configuration:
+class Configuration(DataClassJsonMixin):
     """Configuration data for a Collector."""
+
+    # Sets camel-casing for JSON.
+    # https://github.com/lidatong/dataclasses-json/blob/
+    # 3dc59e01ccdfec619ee4e4c3502b9759b67c3fa8/dataclasses_json/api.py#L140
+    dataclass_json_config: ClassVar[Dict] = dataclass_config(letter_case=camelcase)[
+        "dataclasses_json"
+    ]
 
     username: str
     password: str
@@ -31,11 +46,7 @@ class Configuration:
             filename=filename, dict_config=dict_config
         )
 
-        # pylint/pyright don't understand that the following `from_dict` function comes from the
-        # annotations. It doesn't seem like their comments can be combined.
-
-        # pylint: disable=no-member
-        return Configuration.from_dict(dict_config)  # type: ignore
+        return Configuration.from_dict(dict_config)
 
     @staticmethod
     def _get_dict_config(
