@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional, Tuple
 from loguru import logger
 from selenium import webdriver
 
-from .base import ICollector, Configuration
+from collectors.base import ICollector, Configuration
 
 
 @dataclass

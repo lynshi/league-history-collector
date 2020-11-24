@@ -4,30 +4,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import json
-from typing import ClassVar, Dict, Optional
+from typing import Optional
 
-from dataclasses_json import DataClassJsonMixin, LetterCase
-from dataclasses_json.cfg import config as dataclass_config
-from stringcase import camelcase
+from collectors.models import CamelCasedDataclass
 
 
-# Use camelcase when providing `letter_case` to dataclass_json to pacify type checker,
-# but assert equivalence for sanity.
-assert camelcase is LetterCase.CAMEL
-
-
-# Inherit from DataClassJsonMixin as type checker doesn't get functions dataclass_json
-# provides.
 @dataclass
-class Configuration(DataClassJsonMixin):
+class Configuration(CamelCasedDataclass):
     """Configuration data for a Collector."""
-
-    # Sets camel-casing for JSON.
-    # https://github.com/lidatong/dataclasses-json/blob/
-    # 3dc59e01ccdfec619ee4e4c3502b9759b67c3fa8/dataclasses_json/api.py#L140
-    dataclass_json_config: ClassVar[Dict] = dataclass_config(letter_case=camelcase)[
-        "dataclasses_json"
-    ]
 
     username: str
     password: str
