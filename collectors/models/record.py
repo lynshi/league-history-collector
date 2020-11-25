@@ -9,6 +9,6 @@ from collectors.models.base import CamelCasedDataclass
 class Record(CamelCasedDataclass):
     """Encapsulates a record, which is wins-losses-ties."""
 
-    wins: int = 0
-    losses: int = 0
-    ties: int = 0
+    wins: int
+    losses: int
+    ties: int

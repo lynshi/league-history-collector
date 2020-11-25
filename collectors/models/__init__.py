@@ -1,9 +1,7 @@
 """Models for data returned by collectors. All models are expected to be initialized
-with correct values for non-default, immutable fields; for example, a team's final rank
-must be known at object creation and is not computed over time by calling object methods.
-
-Mutable fields must be updated using object methods. No guarantees are made about data
-consistency if mutable fields are manually, directly updated instead of via the object's API.
+with correct values for non-default fields; for example, a team's final rank
+must be known at object creation and is not computed over time by calling object methods. Fields
+with default values may be, and are expected to be, modified after initialization.
 
 Data is sometimes duplicated between branches. The same Player may be found in both Roster
 and Draft objects. There are a couple reasons for this.

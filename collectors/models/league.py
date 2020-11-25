@@ -29,10 +29,10 @@ class League(CamelCasedDataclass):
     be passed via this field."""
 
     id: str
-    managers: Dict[str, Manager] = {}
+    managers: Dict[str, Manager] = field(default_factory=dict)
 
     manager_data_to_id: Dict[ManagerData, str] = field(
-        metadata=dataclasses_json_config(exclude=Exclude.ALWAYS), default={}
+        metadata=dataclasses_json_config(exclude=Exclude.ALWAYS), default_factory=dict
     )
 
     def get_manager_id(self, manager_data: ManagerData) -> str:

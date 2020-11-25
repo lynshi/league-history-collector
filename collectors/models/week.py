@@ -20,5 +20,5 @@ class Week(CamelCasedDataclass):
     points_scored: float
     points_against: float
 
-    breakdown: Record = Record()
+    breakdown: Record
     roster: Roster = Roster()
