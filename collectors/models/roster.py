@@ -1,6 +1,6 @@
 # pylint: disable=missing-module-docstring
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
 from collectors.models.base import CamelCasedDataclass
@@ -11,5 +11,5 @@ from collectors.models.player import Player
 class Roster(CamelCasedDataclass):
     """Contains data for a roster."""
 
-    starters: List[Player] = field(default_factory=list)
-    bench: List[Player] = field(default_factory=list)
+    starters: List[Player]
+    bench: List[Player]
