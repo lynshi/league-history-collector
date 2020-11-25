@@ -22,6 +22,6 @@ class CamelCasedDataclass(DataClassJsonMixin):
     # Sets camel-casing for JSON.
     # https://github.com/lidatong/dataclasses-json/blob/
     # 3dc59e01ccdfec619ee4e4c3502b9759b67c3fa8/dataclasses_json/api.py#L140
-    dataclass_json_config: ClassVar[Dict] = dataclasses_json_config(letter_case=camelcase)[
-        "dataclasses_json"
-    ]
+    dataclass_json_config: ClassVar[Dict] = dataclasses_json_config(
+        letter_case=camelcase
+    )["dataclasses_json"]

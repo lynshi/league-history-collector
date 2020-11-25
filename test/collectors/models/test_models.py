@@ -6,10 +6,10 @@ from stringcase import camelcase
 
 from collectors.models import CamelCasedDataclass
 
-assert camelcase is LetterCase.CAMEL
-
 
 def test_CamelCasedDataclass():
-    assert CamelCasedDataclass.dataclass_json_config == dataclasses_json_config(letter_case=camelcase)[
-        "dataclasses_json"
-    ]
+    assert camelcase is LetterCase.CAMEL
+    assert (
+        CamelCasedDataclass.dataclass_json_config
+        == dataclasses_json_config(letter_case=camelcase)["dataclasses_json"]
+    )
