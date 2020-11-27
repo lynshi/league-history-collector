@@ -66,6 +66,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         """Save all league data."""
 
         self._login()
+        self._get_seasons()
+
+        return League(id=self._config.league_id)
 
     def _change_page(self, action: Callable[..., Any], *args, **kwargs) -> Any:
         interval = random.uniform(
