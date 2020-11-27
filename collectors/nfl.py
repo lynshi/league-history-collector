@@ -203,7 +203,7 @@ class NFLCollector(ICollector):
                 league.managers[manager_id] = Manager(manager_id, manager_name)
                 team_to_manager[team_id].append(manager_id)
 
-                logger.debug(f"In {year}, found manager {league.managers[manager_id]}")
+                logger.debug(f"In {year}, found manager {manager_name} for team {team_id}")
     
         return team_to_manager
 
