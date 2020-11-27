@@ -4,15 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import random
 import time
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from dataclasses_json import Exclude
-from dataclasses_json import config as dataclass_json_config
 from loguru import logger
 from selenium import webdriver
 
-from collectors.base import Configuration, ICollector, ManagerIdRetriever
-from collectors.models import League
+from collectors.base import Configuration, ICollector
+from collectors.models import League, Manager, Season
 
 
 @dataclass
@@ -20,13 +18,6 @@ class NFLConfiguration(Configuration):
     """Extends the Configuration class with fields specific for NFL Fantasy."""
 
     league_id: str
-
-    # This field is not currently initialized from JSON. If you need to initialize it,
-    # set the value after object creation.
-    manager_id_retriever: ManagerIdRetriever = field(
-        default=ManagerIdRetriever,
-        metadata=dataclass_json_config(exclude=Exclude.ALWAYS),  # type: ignore
-    )
 
     @staticmethod
     def load(
@@ -43,7 +34,7 @@ class NFLConfiguration(Configuration):
         return NFLConfiguration.from_dict(dict_config)
 
 
-class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
+class NFLCollector(ICollector):
     """Implements Collector interface for collecting league data from NFL Fantasy."""
 
     def __init__(
@@ -160,5 +151,105 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         return seasons
 
-    def _get_season_data(self, league: League, year: int) -> League:
-        pass
+    def _set_season_data(self, year: int, league: League):
+        team_to_manager = self._set_managers(year, league)
+        return
+
+        self._set_final_standings(year, team_to_manager, league)
+        self._set_regular_season_results(year, team_to_manager, league)
+
+    def _set_managers(  # pylint: disable=too-many-locals
+        self, year: int, league: League
+    ) -> Dict[str, List[str]]:
+        final_standings_url = self._get_final_standings_url(year)
+        self._change_page(self._driver.get, final_standings_url)
+
+        standings_div = self._driver.find_element_by_id("finalStandings")
+        results_div = standings_div.find_element_by_class_name("results")
+        team_list = results_div.find_elements_by_xpath(".//li")
+
+        team_ids = []
+        for team in team_list:
+            team_page_link = team.find_element_by_xpath(".//a")
+            team_id = team_page_link.get_attribute("href").split("teamId=")[-1]
+
+            try:
+                _ = int(team_id)
+            except ValueError as e:
+                logger.error(
+                    f"Team ID {team_id} for year {year} does not seem correct (not an integer)"
+                )
+                raise RuntimeError(
+                    f"Could not map team IDs to managers in year {year}"
+                ) from e
+            
+            team_ids.append(team_id)
+
+        team_to_manager = {}
+        for team_id in team_ids:
+            team_to_manager[team_id] = []
+
+            team_home_url = self._get_team_home_url(year, team_id)
+            self._change_page(self._driver.get, team_home_url)
+
+            team_detail_div = self._driver.find_element_by_id("teamDetail")
+            right_side_div = team_detail_div.find_element_by_class_name("owners")
+            manager_links = right_side_div.find_elements_by_xpath(".//a")
+
+            for manager_link in manager_links:
+                manager_name = manager_link.get_attribute("textContent")
+                manager_id = manager_link.get_attribute("class").split("userId-")[-1]
+
+                league.managers[manager_id] = Manager(manager_id, manager_name)
+                team_to_manager[team_id].append(manager_id)
+
+                logger.debug(f"In {year}, found manager {league.managers[manager_id]}")
+    
+        return team_to_manager
+
+    def _set_final_standings(
+        self, year: int, team_to_manager: Dict[str, List[str]], league: League
+    ):
+        final_standings_url = self._get_final_standings_url(year)
+        self._change_page(self._driver.get, final_standings_url)
+
+        standings_div = self._driver.find_element_by_id("finalStandings")
+        results_div = standings_div.find_element_by_class_name("results")
+        team_list = results_div.find_elements_by_xpath(".//li")
+
+        manager_final_ranks = {}
+
+        for team in team_list:
+            place_div = team.find_element_by_class_name("place")
+            place_str = ""
+            for character in place_div.text:
+                try:
+                    _ = int(character)
+                    place_str += character
+                except ValueError:  # The numeric place is contained in the first few characters.
+                    break
+
+            place = int(place_str)
+
+    def _set_regular_season_results(
+        self, year: str, team_to_manager: Dict[str, List[str]], league: League
+    ):
+        regular_season_standings_url = self._get_regular_season_standings_url(year)
+
+    def _get_final_standings_url(self, year: int) -> str:
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/standings?historyStandingsType=final"
+        )
+
+    def _get_regular_season_standings_url(self, year: int) -> str:
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/standings?historyStandingsType=regular"
+        )
+
+    def _get_team_home_url(self, year: str, team_id: str) -> str:
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/teamhome?teamId={team_id}"
+        )
