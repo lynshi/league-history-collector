@@ -19,4 +19,5 @@ if __name__ == "__main__":
         collector = NFLCollector(config, driver)
         collector._login()
 
-        driver.save_screenshot("league.png")
+        seasons = collector._get_seasons()
+        logger.info(f"The following seasons are present in league history: {seasons}")

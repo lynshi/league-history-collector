@@ -235,7 +235,7 @@ def test_login(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(1)
+    sleep_mock.assert_called_once_with(3)
 
 
 def test_login_no_login_button(nfl_collector: NFLCollector):
@@ -426,4 +426,4 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(1)
+    sleep_mock.assert_called_once_with(3)

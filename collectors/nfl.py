@@ -4,12 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import random
 import time
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from loguru import logger
 from selenium import webdriver
 
-from collectors.base import ICollector, Configuration
+from collectors.base import Configuration, ICollector
+from collectors.models import League
 
 
 @dataclass
@@ -61,7 +62,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         # Subtract so first action can occur immediately
         self._last_page_load_time = time.time() - self._time_between_pages_range[1]
 
-    def save_all_data(self):
+    def save_all_data(self) -> League:
         """Save all league data."""
 
         self._login()
@@ -113,7 +114,12 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        time.sleep(1)  # wait for redirect
+        sleep_seconds = 3
+        logger.info(
+            f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
+        )
+        time.sleep(sleep_seconds)  # wait for redirect
+
         league_url = f"https://fantasy.nfl.com/league/{self._config.league_id}"
         if league_url != self._driver.current_url:
             msg = f"Expected to be on page {league_url}, but on {self._driver.current_url} instead"
@@ -121,3 +127,21 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             raise RuntimeError(msg)
 
         logger.info("Successfully logged in!")
+
+    def _get_seasons(self) -> List[str]:
+        league_history_url = (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history"
+        )
+        self._change_page(self._driver.get, league_history_url)
+
+        history_season_nav = self._driver.find_element_by_id("historySeasonNav")
+        seasons_dropdown = history_season_nav.find_element_by_class_name("st-menu")
+        season_list_items = seasons_dropdown.find_elements_by_xpath(".//a")
+
+        seasons = []
+        for item in season_list_items:
+            # Gets the year which is in the link text. The item is hidden in the dropdown,
+            # so `.text` does not work.
+            seasons.append(item.get_attribute("textContent").split(" ")[0])
+
+        return seasons
