@@ -1,7 +1,7 @@
 """For collection league data from NFL Fantasy."""
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import random
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -153,8 +153,6 @@ class NFLCollector(ICollector):
 
     def _set_season_data(self, year: int, league: League):
         team_to_manager = self._set_managers(year, league)
-        return
-
         self._set_final_standings(year, team_to_manager, league)
         self._set_regular_season_results(year, team_to_manager, league)
 
@@ -182,7 +180,7 @@ class NFLCollector(ICollector):
                 raise RuntimeError(
                     f"Could not map team IDs to managers in year {year}"
                 ) from e
-            
+
             team_ids.append(team_id)
 
         team_to_manager = {}
@@ -203,8 +201,13 @@ class NFLCollector(ICollector):
                 league.managers[manager_id] = Manager(manager_id, manager_name)
                 team_to_manager[team_id].append(manager_id)
 
-                logger.debug(f"In {year}, found manager {manager_name} for team {team_id}")
-    
+                logger.debug(
+                    f"In {year}, found manager {manager_name} for team {team_id}"
+                )
+
+        logger.debug(
+            f"Team to manager mapping: {team_to_manager}"
+        )
         return team_to_manager
 
     def _set_final_standings(
