@@ -6,12 +6,11 @@ from dataclasses import dataclass
 import json
 from typing import Optional
 
-from dataclasses_json import dataclass_json, LetterCase
+from collectors.models import CamelCasedDataclass
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class Configuration:
+class Configuration(CamelCasedDataclass):
     """Configuration data for a Collector."""
 
     username: str
@@ -31,11 +30,7 @@ class Configuration:
             filename=filename, dict_config=dict_config
         )
 
-        # pylint/pyright don't understand that the following `from_dict` function comes from the
-        # annotations. It doesn't seem like their comments can be combined.
-
-        # pylint: disable=no-member
-        return Configuration.from_dict(dict_config)  # type: ignore
+        return Configuration.from_dict(dict_config)
 
     @staticmethod
     def _get_dict_config(

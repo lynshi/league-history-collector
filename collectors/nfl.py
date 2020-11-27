@@ -6,14 +6,12 @@ import random
 import time
 from typing import Any, Callable, Optional, Tuple
 
-from dataclasses_json import dataclass_json, LetterCase
 from loguru import logger
 from selenium import webdriver
 
-from .base import ICollector, Configuration
+from collectors.base import ICollector, Configuration
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
 class NFLConfiguration(Configuration):
     """Extends the Configuration class with fields specific for NFL Fantasy."""
@@ -32,8 +30,7 @@ class NFLConfiguration(Configuration):
         dict_config = {**dict_config, **dict_config["nfl"]}
         del dict_config["nfl"]
 
-        # pylint: disable=no-member
-        return NFLConfiguration.from_dict(dict_config)  # type: ignore
+        return NFLConfiguration.from_dict(dict_config)
 
 
 class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
