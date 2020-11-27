@@ -1,15 +1,17 @@
 """For collection league data from NFL Fantasy."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import random
 import time
 from typing import Any, Callable, List, Optional, Tuple
 
+from dataclasses_json import Exclude
+from dataclasses_json import config as dataclass_json_config
 from loguru import logger
 from selenium import webdriver
 
-from collectors.base import Configuration, ICollector
+from collectors.base import Configuration, ICollector, ManagerIdRetriever
 from collectors.models import League
 
 
@@ -18,6 +20,13 @@ class NFLConfiguration(Configuration):
     """Extends the Configuration class with fields specific for NFL Fantasy."""
 
     league_id: str
+
+    # This field is not currently initialized from JSON. If you need to initialize it,
+    # set the value after object creation.
+    manager_id_retriever: ManagerIdRetriever = field(
+        default=ManagerIdRetriever,
+        metadata=dataclass_json_config(exclude=Exclude.ALWAYS),  # type: ignore
+    )
 
     @staticmethod
     def load(
@@ -65,10 +74,12 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
     def save_all_data(self) -> League:
         """Save all league data."""
 
+        league = League(id=self._config.league_id)
+
         self._login()
         self._get_seasons()
 
-        return League(id=self._config.league_id)
+        return league
 
     def _change_page(self, action: Callable[..., Any], *args, **kwargs) -> Any:
         interval = random.uniform(
@@ -148,3 +159,6 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             seasons.append(item.get_attribute("textContent").split(" ")[0])
 
         return seasons
+
+    def _get_season_data(self, league: League, year: int) -> League:
+        pass

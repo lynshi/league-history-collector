@@ -12,7 +12,7 @@ and Draft objects. There are a couple reasons for this.
 """
 
 from collectors.models.base import CamelCasedDataclass
-from collectors.models.league import League, ManagerData
+from collectors.models.league import League
 from collectors.models.manager import Manager
 from collectors.models.player import Player
 from collectors.models.record import Record
