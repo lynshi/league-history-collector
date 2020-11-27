@@ -12,7 +12,7 @@ from collectors.models.roster import Roster
 class Week(CamelCasedDataclass):
     """Contains data for a single week."""
 
-    id: int  # e.g. 3 for Week 3
+    id: str  # e.g. 3 for Week 3
 
     opponent_id: List[
         str

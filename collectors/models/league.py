@@ -31,19 +31,24 @@ class League(CamelCasedDataclass):
     id: str
     managers: Dict[str, Manager] = field(default_factory=dict)
 
+    # Typing on the `exclude` parameter is inaccurate.
     manager_data_to_id: Dict[ManagerData, str] = field(
-        metadata=dataclasses_json_config(exclude=Exclude.ALWAYS), default_factory=dict
+        metadata=dataclasses_json_config(exclude=Exclude.ALWAYS),  # type: ignore
+        default_factory=dict,
     )
 
     def get_manager_id(self, manager_data: ManagerData) -> str:
-        """Returns a manager's ID given uniquely-identifying data."""
+        """Returns a manager's ID given uniquely-identifying data.
+
+        If no pre-assigned ID is found, the returned ID is just the manager's name.
+        If multiple managers have the same name, the expectation is for the creator
+        of this object to dictate the assigned ID via `manager_data_to_id`."""
 
         manager_id = self.manager_data_to_id.get(manager_data, None)
-        if manager_data is not None:
+        if manager_id is not None:
             return manager_id
 
-        num_managers = len(self.managers)
-        manager_id = f"{manager_data.name}-{num_managers}"
+        manager_id = f"{manager_data.name}"
 
         self.manager_data_to_id[manager_data] = manager_id
         return manager_id

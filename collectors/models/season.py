@@ -12,7 +12,7 @@ from collectors.models.week import Week
 class Season(CamelCasedDataclass):  # pylint: disable=too-many-instance-attributes
     """Contains data for a manager's season."""
 
-    id: int  # e.g. a year
+    id: str  # e.g. a year
 
     final_rank: int
 
@@ -23,4 +23,4 @@ class Season(CamelCasedDataclass):  # pylint: disable=too-many-instance-attribut
     regular_season_record: Record
     regular_season_breakdown: Record
 
-    weeks: Dict[int, Week] = field(default_factory=dict)
+    weeks: Dict[str, Week] = field(default_factory=dict)

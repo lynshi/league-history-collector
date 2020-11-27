@@ -12,4 +12,4 @@ class Manager(CamelCasedDataclass):
     """Contains a manager's data."""
 
     id: str
-    seasons: Dict[int, Season] = field(default_factory=dict)
+    seasons: Dict[str, Season] = field(default_factory=dict)
