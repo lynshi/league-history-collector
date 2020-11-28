@@ -506,6 +506,18 @@ def test_get_week_schedule_url(nfl_collector: NFLCollector):
     assert nfl_collector._get_week_schedule_url(year, week) == expected_url
 
 
+def test_get_matchup_url(nfl_collector: NFLCollector):
+    year = 2018
+    week = 3
+    team_id = "2"
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/teamgamecenter?teamId={team_id}&week={week}"
+    )
+
+    assert nfl_collector._get_matchup_url(year, week, team_id) == expected_url
+
+
 def test_get_team_id_from_link():
     team_id = "2"
 
@@ -515,6 +527,8 @@ def test_get_team_id_from_link():
     )
 
     assert team_id == NFLCollector._get_team_id_from_link(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("href")
 
 
 def test_get_team_id_from_link_invalid():
@@ -527,3 +541,28 @@ def test_get_team_id_from_link_invalid():
 
     with pytest.raises(RuntimeError):
         NFLCollector._get_team_id_from_link(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("href")
+
+
+def test_get_team_id_from_class():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = f"teamTotal teamId-{team_id}"
+
+    assert team_id == NFLCollector._get_team_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")
+
+
+def test_get_team_id_from_class_invalid():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = f"teamTotal teamId-{team_id}-"
+
+    with pytest.raises(RuntimeError):
+        NFLCollector._get_team_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")

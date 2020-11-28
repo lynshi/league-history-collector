@@ -13,12 +13,16 @@ from selenium.webdriver.remote.webelement import WebElement
 from collectors.base import Configuration, ICollector
 from collectors.models import (
     FinalStanding,
+    Game,
     League,
     Manager,
     ManagerStanding,
     RegularSeasonStanding,
     Record,
+    Roster,
     Season,
+    TeamGameData,
+    Week,
 )
 
 
@@ -140,7 +144,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        logger.info("Successfully logged in!")
+        logger.success("Successfully logged in!")
 
     def _get_seasons(self) -> List[int]:
         league_history_url = (
@@ -188,6 +192,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             league.seasons[year].standings[manager_id] = manager_standing
 
         # Get games information.
+        weeks_in_league = self._get_weeks(year)
+        for week in weeks_in_league:
+            pass
 
         # Populate league with games information.
 
@@ -340,6 +347,85 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         logger.debug(f"Weeks with games: {weeks}")
         return weeks
 
+    def _get_games_for_week(  # pylint: disable=too-many-locals
+        self, year: int, week: int, team_to_manager: Dict[str, List[str]]
+    ) -> List[Game]:
+        schedule_url = self._get_week_schedule_url(year, 1)
+        self._change_page(self._driver.get, schedule_url)
+
+        schedule_content_div = self._driver.find_element_by_class_name(
+            "scheduleContentWrap"
+        )
+        schedule_content = schedule_content_div.find_element_by_class_name(
+            "scheduleContent"
+        )
+        matchup_items = schedule_content.find_elements_by_class_name("matchup")
+
+        matchups = []
+        for matchup_iteam in matchup_items:
+            team_ids = set()
+
+            team_links = matchup_iteam.find_elements_by_class_name("teamName")
+            for team_link in team_links:
+                team_id = self._get_team_id_from_link(team_link)
+                team_ids.add(team_id)
+
+            matchups.append(tuple(team_ids))
+            logger.debug(f"Added matchup {matchups[-1]} for week {week} in {year}")
+
+        game_results = []
+        for matchup in matchups:
+            game_results.append(
+                self._get_game_results(year, week, team_to_manager, matchup)
+            )
+
+        return game_results
+
+    def _get_game_results(
+        self,
+        year: int,
+        week: int,
+        team_to_manager: Dict[str, List[str]],
+        matchup: Tuple[str, str],
+    ) -> Game:
+        matchup_url = self._get_matchup_url(year, week, matchup[0])
+        self._change_page(self._driver.get, matchup_url)
+
+        team_matchup_header = self._driver.find_element_by_id("teamMatchupHeader")
+        team_total_divs = team_matchup_header.find_elements_by_class_name("teamTotal")
+
+        if len(team_total_divs) != 2:
+            raise RuntimeError(f"Expected 2 team totals, got {len(team_total_divs)}")
+
+        # Get points and copy team manager list first.
+        team_data = {}
+        for team_total in team_total_divs:
+            team_id = self._get_team_id_from_class(team_total)
+            if team_id not in matchup:
+                raise RuntimeError(
+                    f"Unexpected team ID {team_id} for matchup {matchup}"
+                )
+
+            team_points = float(team_total.text)
+            logger.debug(f"Team {team_id} scored {team_points} in week {week} of {year}.")
+
+            team_data[team_id] = TeamGameData(
+                team_points, team_to_manager[team_id], Roster(starters=[], bench=[])
+            )
+        
+        team_matchup_track = self._driver.find_element_by_id("teamMatchupTrack")
+        team_matchup_type_nav = team_matchup_track.find_element_by_class_name("teamMatchupTypeNav")
+        full_box_score_tab = team_matchup_type_nav.find_element_by_link_text("Full Box Score")
+        
+        self._change_page(full_box_score_tab.click)
+
+        sleep_seconds = 3
+        logger.info(f"Sleeping {sleep_seconds} seconds to wait for change to 'Full Box Score' tab.")
+        time.sleep(sleep_seconds)
+
+        self._driver.save_screenshot("game.png")
+
+        return None
 
     def _get_final_standings_url(self, year: int) -> str:
         return (
@@ -366,13 +452,36 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
         )
 
+    def _get_matchup_url(self, year: int, week: int, team_id: str) -> str:
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/teamgamecenter?teamId={team_id}&week={week}"
+        )
+
     @staticmethod
     def _get_team_id_from_link(link: WebElement) -> str:
-        team_id = link.get_attribute("href").split("teamId=")[-1]
+        href_attribute = link.get_attribute("href")
+        team_id = href_attribute.split("teamId=")[-1]
         try:
             _ = int(team_id)
         except ValueError as e:
             logger.error(f"Team ID {team_id} does not seem correct (not an integer)")
-            raise RuntimeError("Could not get team ID") from e
+            raise RuntimeError(
+                f"Could not get team ID from `href` attribute: {href_attribute}"
+            ) from e
+
+        return team_id
+
+    @staticmethod
+    def _get_team_id_from_class(element: WebElement) -> str:
+        class_attribute = element.get_attribute("class")
+        team_id = class_attribute.split("teamId-")[-1]
+        try:
+            _ = int(team_id)
+        except ValueError as e:
+            logger.error(f"Team ID {team_id} does not seem correct (not an integer)")
+            raise RuntimeError(
+                f"Could not get team ID from `class` attribute: {class_attribute}"
+            ) from e
 
         return team_id
