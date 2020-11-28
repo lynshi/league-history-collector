@@ -455,21 +455,16 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         # The team selected by `team_id` is first in the box score table and `team_wrap_divs`.
         # This corresponds to the team identified by`matchup[0]`.
 
-        table_bodies = team_wrap_divs.find_element_by_xpath(".//tbody")
-
-        # Position players, Kicker, Defense
-        first_team_roster_tables = table_bodies[:3]
-        second_team_roster_tables = table_bodies[3:]
-
         rosters = {
             matchup[0]: Roster(starters=[], bench=[]),
             matchup[1]: Roster(starters=[], bench=[]),
         }
 
-        for team_idx, roster_table in enumerate(
-            [first_team_roster_tables, second_team_roster_tables]
-        ):
-            for table in roster_table:
+        for team_idx, team_wrap_div in enumerate(team_wrap_divs):
+            roster_tables = team_wrap_div.find_elements_by_xpath(".//tbody")
+
+            # Position players, Kicker, Defense
+            for table in roster_tables:
                 table_rows = table.find_elements_by_xpath(".//tr")
 
                 for table_row in table_rows:

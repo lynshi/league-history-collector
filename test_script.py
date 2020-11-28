@@ -16,6 +16,7 @@ FLAGS = {
     "GET_SEASONS": False,
     "GET_WEEKS": False,
     "GET_GAME_RESULTS": True,
+    "GET_WEEK_RESULTS": True,
 }
 
 
@@ -65,3 +66,7 @@ if __name__ == "__main__":
                 2019, 1, team_to_manager, ("2", "4")
             )
             logger.info(f"2019 Week 1:\n{game_results.to_json()}")
+
+        if FLAGS["GET_WEEK_RESULTS"]:
+            week_results = collector._get_games_for_week(2019, 1, team_to_manager)
+            logger.info(f"2019 Week 1:\n{week_results.to_json()}")
