@@ -10,6 +10,5 @@ from utils import CamelCasedDataclass
 class Manager(CamelCasedDataclass):
     """Contains a manager's data."""
 
-    id: str
     name: str
     seasons: List[int]  # List of years

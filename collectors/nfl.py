@@ -10,7 +10,14 @@ from loguru import logger
 from selenium import webdriver
 
 from collectors.base import Configuration, ICollector
-from collectors.models import League, Manager
+from collectors.models import (
+    FinalStanding,
+    League,
+    Manager,
+    ManagerStanding,
+    RegularSeasonStanding,
+    Season,
+)
 
 
 @dataclass
@@ -152,18 +159,35 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         return seasons
 
     def _set_season_data(self, year: int, league: League):
+        # Get mapping of team ID to manager ID, and list of managers for the year.
         team_to_manager, managers = self._get_managers(year)
-        for manager in managers:
-            if manager.id not in league.managers:
+
+        # Set up empty object.
+        league.seasons[year] = Season(standings={}, weeks={})
+
+        # Collect standings information.
+        final_standings = self._get_final_standings(year, team_to_manager)
+        regular_season_standings = self._get_regular_season_standings(
+            year, team_to_manager
+        )
+
+        # Populate league with standings information.
+        for manager_id, manager in managers.items():
+            if manager_id not in league.managers:
                 logger.debug(f"Adding manager {manager} to league")
-                league.managers[manager.id] = manager
-        return
-        self._get_final_standings(year, team_to_manager)
-        self._get_regular_season_results(year, team_to_manager)
+                league.managers[manager_id] = manager
+            else:
+                league.managers[manager_id].seasons.append(year)
+
+            manager_standing = ManagerStanding(
+                final_standing=final_standings[manager_id],
+                regular_season_standing=regular_season_standings[manager_id],
+            )
+            league.seasons[year].standings[manager_id] = manager_standing
 
     def _get_managers(  # pylint: disable=too-many-locals
         self, year: int
-    ) -> Tuple[Dict[str, List[str]], List[Manager]]:
+    ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         final_standings_url = self._get_final_standings_url(year)
         self._change_page(self._driver.get, final_standings_url)
 
@@ -189,7 +213,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_ids.append(team_id)
 
         team_to_manager = {}
-        managers = []
+        managers = {}
         for team_id in team_ids:
             team_to_manager[team_id] = []
 
@@ -205,7 +229,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 manager_id = manager_link.get_attribute("class").split("userId-")[-1]
 
                 team_to_manager[team_id].append(manager_id)
-                managers.append(Manager(manager_id, manager_name, [year]))
+                managers[manager_id] = Manager(manager_name, [year])
 
                 logger.debug(
                     f"In {year}, found manager {manager_name} for team {team_id}"
@@ -216,7 +240,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
     def _get_final_standings(  # pylint: disable=too-many-locals
         self, year: int, team_to_manager: Dict[str, List[str]]
-    ) -> Dict[str, int]:
+    ) -> Dict[str, FinalStanding]:
         final_standings_url = self._get_final_standings_url(year)
         self._change_page(self._driver.get, final_standings_url)
 
@@ -224,6 +248,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         results_div = standings_div.find_element_by_class_name("results")
         team_list = results_div.find_elements_by_xpath(".//li")
 
+        final_standings = {}
         for team in team_list:
             place_div = team.find_element_by_class_name("place")
             place_str = ""
@@ -240,12 +265,13 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_id = team_link.get_attribute("href").split("teamId=")[-1]
 
             manager_id = team_to_manager[team_id]
+            final_standings[manager_id] = FinalStanding(place)
 
-        return {}
+        return final_standings
 
-    def _get_regular_season_results(
+    def _get_regular_season_standings(
         self, year: int, team_to_manager: Dict[str, List[str]]
-    ):
+    ) -> Dict[str, RegularSeasonStanding]:
         _ = self._get_regular_season_standings_url(year)
         return {}
 

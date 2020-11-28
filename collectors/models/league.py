@@ -14,4 +14,4 @@ class League(CamelCasedDataclass):
 
     id: str
     managers: Dict[str, Manager]
-    seasons: Dict[str, Season]
+    seasons: Dict[int, Season]
