@@ -74,7 +74,9 @@ def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login = MagicMock()
     nfl_collector._get_seasons = MagicMock(return_value=["2019", "2018"])
 
-    assert nfl_collector.save_all_data() == League(id=nfl_collector._config.league_id)
+    assert nfl_collector.save_all_data() == League(
+        nfl_collector._config.league_id, {}, {}
+    )
 
     nfl_collector._login.assert_called_once()
     nfl_collector._get_seasons.assert_called_once()
@@ -447,7 +449,7 @@ def test_get_seasons(nfl_collector: NFLCollector):
     season0_mock.get_attribute.return_value = "2019 Season"
     season1_mock.get_attribute.return_value = "2018 Season"
 
-    assert nfl_collector._get_seasons() == ["2019", "2018"]
+    assert nfl_collector._get_seasons() == [2019, 2018]
 
     nfl_collector._change_page.assert_called_once_with(
         nfl_collector._driver.get,

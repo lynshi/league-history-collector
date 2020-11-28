@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
-from typing import Dict, NamedTuple, Optional
+from typing import Optional
 
-from collectors.models import CamelCasedDataclass, League
+from collectors.models import League
+from utils import CamelCasedDataclass
 
 
 @dataclass

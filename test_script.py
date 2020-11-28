@@ -28,4 +28,3 @@ if __name__ == "__main__":
         collector._set_season_data(2019, league)
 
         print(json.dumps(league.to_dict(), sort_keys=True, indent=4))
-

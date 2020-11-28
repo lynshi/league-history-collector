@@ -34,7 +34,7 @@ class NFLConfiguration(Configuration):
         return NFLConfiguration.from_dict(dict_config)
 
 
-class NFLCollector(ICollector):
+class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
     """Implements Collector interface for collecting league data from NFL Fantasy."""
 
     def __init__(
@@ -65,7 +65,7 @@ class NFLCollector(ICollector):
     def save_all_data(self) -> League:
         """Save all league data."""
 
-        league = League(id=self._config.league_id)
+        league = League(id=self._config.league_id, managers={}, seasons={})
 
         self._login()
         self._get_seasons()
@@ -133,7 +133,7 @@ class NFLCollector(ICollector):
 
         logger.info("Successfully logged in!")
 
-    def _get_seasons(self) -> List[str]:
+    def _get_seasons(self) -> List[int]:
         league_history_url = (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history"
         )
@@ -147,19 +147,23 @@ class NFLCollector(ICollector):
         for item in season_list_items:
             # Gets the year which is in the link text. The item is hidden in the dropdown,
             # so `.text` does not work.
-            seasons.append(item.get_attribute("textContent").split(" ")[0])
+            seasons.append(int(item.get_attribute("textContent").split(" ")[0]))
 
         return seasons
 
     def _set_season_data(self, year: int, league: League):
-        team_to_manager = self._get_managers(year, league)
+        team_to_manager, managers = self._get_managers(year)
+        for manager in managers:
+            if manager.id not in league.managers:
+                logger.debug(f"Adding manager {manager} to league")
+                league.managers[manager.id] = manager
         return
         self._get_final_standings(year, team_to_manager)
         self._get_regular_season_results(year, team_to_manager)
 
     def _get_managers(  # pylint: disable=too-many-locals
-        self, year: int, league: League
-    ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
+        self, year: int
+    ) -> Tuple[Dict[str, List[str]], List[Manager]]:
         final_standings_url = self._get_final_standings_url(year)
         self._change_page(self._driver.get, final_standings_url)
 
@@ -185,6 +189,7 @@ class NFLCollector(ICollector):
             team_ids.append(team_id)
 
         team_to_manager = {}
+        managers = []
         for team_id in team_ids:
             team_to_manager[team_id] = []
 
@@ -199,17 +204,15 @@ class NFLCollector(ICollector):
                 manager_name = manager_link.get_attribute("textContent")
                 manager_id = manager_link.get_attribute("class").split("userId-")[-1]
 
-                league.managers[manager_id] = Manager(manager_id, manager_name)
                 team_to_manager[team_id].append(manager_id)
+                managers.append(Manager(manager_id, manager_name, [year]))
 
                 logger.debug(
                     f"In {year}, found manager {manager_name} for team {team_id}"
                 )
 
-        logger.debug(
-            f"Team to manager mapping: {team_to_manager}"
-        )
-        return team_to_manager
+        logger.debug(f"Team to manager mapping: {team_to_manager}")
+        return team_to_manager, managers
 
     def _get_final_standings(  # pylint: disable=too-many-locals
         self, year: int, team_to_manager: Dict[str, List[str]]
@@ -237,12 +240,14 @@ class NFLCollector(ICollector):
             team_id = team_link.get_attribute("href").split("teamId=")[-1]
 
             manager_id = team_to_manager[team_id]
-            manager_season = league.managers[manager_id]
+
+        return {}
 
     def _get_regular_season_results(
-        self, year: str, team_to_manager: Dict[str, List[str]]
+        self, year: int, team_to_manager: Dict[str, List[str]]
     ):
-        regular_season_standings_url = self._get_regular_season_standings_url(year)
+        _ = self._get_regular_season_standings_url(year)
+        return {}
 
     def _get_final_standings_url(self, year: int) -> str:
         return (
@@ -256,7 +261,7 @@ class NFLCollector(ICollector):
             f"{year}/standings?historyStandingsType=regular"
         )
 
-    def _get_team_home_url(self, year: str, team_id: str) -> str:
+    def _get_team_home_url(self, year: int, team_id: str) -> str:
         return (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
             f"{year}/teamhome?teamId={team_id}"
