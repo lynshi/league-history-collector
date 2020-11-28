@@ -1,4 +1,4 @@
-"""Base model object."""
+"""Utility objects and functions."""
 
 from dataclasses import dataclass
 from typing import ClassVar, Dict

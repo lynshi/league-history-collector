@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.base import CamelCasedDataclass
 from collectors.models.player import Player
+from utils import CamelCasedDataclass
 
 
 @dataclass

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from collectors import NFLCollector, NFLConfiguration
+from collectors.models import League
 
 
 def test_NFLConfiguration_load():
@@ -71,9 +72,14 @@ def fixture_nfl_collector():
 
 def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login = MagicMock()
+    nfl_collector._get_seasons = MagicMock(return_value=["2019", "2018"])
 
-    nfl_collector.save_all_data()
+    assert nfl_collector.save_all_data() == League(
+        nfl_collector._config.league_id, {}, {}
+    )
+
     nfl_collector._login.assert_called_once()
+    nfl_collector._get_seasons.assert_called_once()
 
 
 def test_change_page_no_sleep(nfl_collector: NFLCollector):
@@ -235,7 +241,7 @@ def test_login(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(1)
+    sleep_mock.assert_called_once_with(3)
 
 
 def test_login_no_login_button(nfl_collector: NFLCollector):
@@ -426,4 +432,32 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(1)
+    sleep_mock.assert_called_once_with(3)
+
+
+def test_get_seasons(nfl_collector: NFLCollector):
+    nav_mock = MagicMock()
+    dropdown_mock = MagicMock()
+    season0_mock = MagicMock()
+    season1_mock = MagicMock()
+
+    nfl_collector._change_page = MagicMock()
+    nfl_collector._driver.find_element_by_id.return_value = nav_mock
+    nav_mock.find_element_by_class_name.return_value = dropdown_mock
+    dropdown_mock.find_elements_by_xpath.return_value = [season0_mock, season1_mock]
+
+    season0_mock.get_attribute.return_value = "2019 Season"
+    season1_mock.get_attribute.return_value = "2018 Season"
+
+    assert nfl_collector._get_seasons() == [2019, 2018]
+
+    nfl_collector._change_page.assert_called_once_with(
+        nfl_collector._driver.get,
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history",
+    )
+    nfl_collector._driver.find_element_by_id.assert_called_once_with("historySeasonNav")
+    nav_mock.find_element_by_class_name.assert_called_once_with("st-menu")
+    dropdown_mock.find_elements_by_xpath.assert_called_once_with(".//a")
+
+    season0_mock.get_attribute.assert_called_once_with("textContent")
+    season1_mock.get_attribute.assert_called_once_with("textContent")

@@ -6,7 +6,7 @@ import selenium.webdriver as webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 from collectors import models
-from collectors.base import ICollector, Configuration
+from collectors.base import Configuration, ICollector
 from collectors.nfl import NFLCollector, NFLConfiguration
 
 

@@ -1,26 +1,43 @@
 # pylint: disable=missing-module-docstring
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict
 
-from collectors.models.base import CamelCasedDataclass
 from collectors.models.record import Record
 from collectors.models.week import Week
+from utils import CamelCasedDataclass
 
 
 @dataclass
-class Season(CamelCasedDataclass):  # pylint: disable=too-many-instance-attributes
+class FinalStanding(CamelCasedDataclass):
+    """Contains details about the final standing."""
+
+    rank: int
+
+
+@dataclass
+class RegularSeasonStanding(CamelCasedDataclass):
+    """Contains details about the regular season standing."""
+
+    rank: int
+
+    points_scored: float
+    points_against: float
+
+    record: Record
+
+
+@dataclass
+class ManagerStanding(CamelCasedDataclass):
     """Contains data for a manager's season."""
 
-    id: str  # e.g. a year
+    final_standing: FinalStanding
+    regular_season_standing: RegularSeasonStanding
 
-    final_rank: int
 
-    regular_season_rank: int
-    regular_season_points_scored: float
-    regular_season_points_against: float
+@dataclass
+class Season(CamelCasedDataclass):
+    """Contains data about a season."""
 
-    regular_season_record: Record
-    regular_season_breakdown: Record
-
-    weeks: Dict[str, Week] = field(default_factory=dict)
+    standings: Dict[str, ManagerStanding]
+    weeks: Dict[int, Week]

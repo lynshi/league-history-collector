@@ -1,15 +1,14 @@
 # pylint: disable=missing-module-docstring
 
-from dataclasses import dataclass, field
-from typing import Dict
+from dataclasses import dataclass
+from typing import List
 
-from collectors.models.base import CamelCasedDataclass
-from collectors.models.season import Season
+from utils import CamelCasedDataclass
 
 
 @dataclass
 class Manager(CamelCasedDataclass):
     """Contains a manager's data."""
 
-    id: str
-    seasons: Dict[str, Season] = field(default_factory=dict)
+    name: str
+    seasons: List[int]  # List of years

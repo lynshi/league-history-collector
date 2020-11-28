@@ -4,7 +4,7 @@ from dataclasses_json import LetterCase
 from dataclasses_json import config as dataclasses_json_config
 from stringcase import camelcase
 
-from collectors.models import CamelCasedDataclass
+from utils import CamelCasedDataclass
 
 
 def test_CamelCasedDataclass():

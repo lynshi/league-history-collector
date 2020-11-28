@@ -3,22 +3,31 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.base import CamelCasedDataclass
-from collectors.models.record import Record
 from collectors.models.roster import Roster
+from utils import CamelCasedDataclass
+
+
+@dataclass
+class TeamGameData(CamelCasedDataclass):
+    """Contains data about a team's performance in a game."""
+
+    # Manager lists to accomodate co-managers.
+    points: int
+    managers: List[str]
+    roster: Roster
+
+
+@dataclass
+class Game(CamelCasedDataclass):
+    """Contains data about a specific game in a week."""
+
+    team_data: List[TeamGameData]
+    winning_managers: List[str]
+    tied: bool = False
 
 
 @dataclass
 class Week(CamelCasedDataclass):
     """Contains data for a single week."""
 
-    id: str  # e.g. 3 for Week 3
-
-    opponent_id: List[
-        str
-    ]  # at least the opposing team's manager's ID, more if co-owned
-    points_scored: float
-    points_against: float
-
-    breakdown_record: Record
-    roster: Roster
+    games: List[Game]

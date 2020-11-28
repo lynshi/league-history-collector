@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import json
 from typing import Optional
 
-from collectors.models import CamelCasedDataclass
+from collectors.models import League
+from utils import CamelCasedDataclass
 
 
 @dataclass
@@ -55,5 +56,5 @@ class ICollector(ABC):  # pylint: disable=too-few-public-methods
     """Abstract base class for collecting data."""
 
     @abstractmethod
-    def save_all_data(self):
+    def save_all_data(self) -> League:
         """Save all retrievable data as desired by the implementation."""
