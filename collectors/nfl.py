@@ -258,6 +258,10 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             managers = team_to_manager[team_id]
             for manager_id in managers:
                 final_standings[manager_id] = FinalStanding(place)
+                logger.debug(
+                    f"Final standing for manager {manager_id} in {year}: "
+                    f"{final_standings[manager_id].to_json()}"
+                )
 
         return final_standings
 
@@ -277,9 +281,17 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_link = team.find_element_by_class_name("teamName")
             team_id = self._get_team_id_from_link(team_link)
 
-            team_rank = int(
-                team.find_element_by_class_name(f"teamRank teamId-{team_id}").text
-            )
+            possible_rank_spans = team.find_element_by_class_name(f"teamId-{team_id}")
+            team_rank = None
+            for span in possible_rank_spans:
+                if "teamRank" in span.get_attribute("class"):
+                    team_rank = int(span.text)
+                    break
+
+            if team_rank is None:
+                raise RuntimeError(
+                    "Could not get team rank for team {team_id} in {year}"
+                )
 
             wins, losses, ties = team.find_element_by_class_name(
                 "teamRecord"
@@ -296,6 +308,11 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                     points_scored=points_scored,
                     points_against=points_against,
                     record=team_record,
+                )
+
+                logger.debug(
+                    f"Regular season standing for manager {manager_id} in {year}: "
+                    f"{regular_season_standings[manager_id].to_json()}"
                 )
 
         return regular_season_standings
