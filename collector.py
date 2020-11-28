@@ -1,6 +1,9 @@
 """Collects league history."""
 
 import argparse
+import sys
+
+from loguru import logger
 
 from collectors import NFLCollector, NFLConfiguration, selenium_driver
 
@@ -17,6 +20,9 @@ def run_collector(collector_config: NFLConfiguration):
 
 
 if __name__ == "__main__":
+    logger.remove(0)
+    logger.add(sys.stderr, level="DEBUG")
+
     parser = argparse.ArgumentParser("Collects fantasy football league history")
     parser.add_argument(
         "-c", "--config", help="Path to configuration file", default="config.json"

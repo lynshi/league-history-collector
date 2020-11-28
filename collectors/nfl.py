@@ -146,11 +146,12 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        sleep_seconds = 3
-        logger.info(
-            f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
-        )
-        time.sleep(sleep_seconds)  # wait for redirect
+        sleep_seconds = 3 - self._wait_seconds_after_page_change
+        if sleep_seconds > 0:
+            logger.info(
+                f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
+            )
+            time.sleep(sleep_seconds)  # wait for redirect
 
         league_url = f"https://fantasy.nfl.com/league/{self._config.league_id}"
         if league_url != self._driver.current_url:
