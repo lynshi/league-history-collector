@@ -18,7 +18,7 @@ if __name__ == "__main__":
     config = NFLConfiguration.load(filename="config.json")
 
     with selenium_driver() as driver:
-        collector = NFLCollector(config, driver)
+        collector = NFLCollector(config, driver, (0, 1))
         collector._login()
 
         seasons = collector._get_seasons()

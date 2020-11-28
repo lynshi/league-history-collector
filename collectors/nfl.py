@@ -299,8 +299,8 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_record = Record(wins=wins, losses=losses, ties=ties)
 
             points = team.find_elements_by_class_name("teamPts")
-            points_scored = float(points[0].text)
-            points_against = float(points[1].text)
+            points_scored = float(points[0].text.replace(","))
+            points_against = float(points[1].text.replace(","))
 
             for manager_id in team_to_manager[team_id]:
                 regular_season_standings[manager_id] = RegularSeasonStanding(
