@@ -57,6 +57,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         config: NFLConfiguration,
         driver: webdriver.Remote,
         time_between_pages_range: Tuple[int, int] = (2, 4),
+        wait_seconds_after_page_change: int = 2,
     ):
         """Create an NFLCollector.
 
@@ -73,6 +74,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         self._driver = driver
         self._time_between_pages_range = time_between_pages_range
+        self._wait_seconds_after_page_change = wait_seconds_after_page_change
 
         # Subtract so first action can occur immediately
         self._last_page_load_time = time.time() - self._time_between_pages_range[1]
@@ -83,7 +85,10 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         league = League(id=self._config.league_id, managers={}, seasons={})
 
         self._login()
-        self._get_seasons()
+
+        seasons = self._get_seasons()
+        for year in seasons:
+            self._set_season_data(year, league)
 
         return league
 
@@ -95,7 +100,14 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         time.sleep(max(0, (interval - (time.time() - self._last_page_load_time))))
         self._last_page_load_time = time.time()
 
-        return action(*args, **kwargs)
+        result = action(*args, **kwargs)
+
+        logger.debug(
+            f"Waiting {self._wait_seconds_after_page_change} seconds after page change"
+        )
+        time.sleep(self._wait_seconds_after_page_change)
+
+        return result
 
     def _login(self):
         login_url = (
@@ -481,12 +493,15 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                         )
                         continue
 
-                    player_card = table_row.find_elements_by_class_name("playerCard")
+                    player_card = table_row.find_element_by_class_name("playerCard")
                     player_id = self._get_player_id_from_class(player_card)
                     player_name = player_card.text
-                    player_position = table_row.find_element_by_xpath("em").text.split(
-                        " - "
-                    )[0]
+
+                    player_name_and_info = table_row.find_element_by_class_name(
+                        "playerNameAndInfo"
+                    )
+                    c_class = player_name_and_info.find_element_by_class_name("c")
+                    player_position = c_class.text.split(" - ")[0].split("\n")[-1]
 
                     player = Player(
                         id=player_id, name=player_name, position=player_position

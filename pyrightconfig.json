@@ -1,5 +1,5 @@
 {
   "include": [
-    "collectors", "test", "test_script.py"
+    "collector.py", "collectors", "test", "test_script.py"
   ]
 }

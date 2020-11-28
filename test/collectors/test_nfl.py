@@ -40,14 +40,21 @@ def test_init():
 
     driver_mock = MagicMock()
     time_between_pages_range = (3, 5)
+    wait_seconds_after_page_change = 1
 
     with patch("time.time") as time_mock:
         time_mock.return_value = 42
-        collector = NFLCollector(config, driver_mock, time_between_pages_range)
+        collector = NFLCollector(
+            config,
+            driver_mock,
+            time_between_pages_range,
+            wait_seconds_after_page_change,
+        )
 
     assert collector._config == config
     assert collector._driver == driver_mock
     assert collector._time_between_pages_range == time_between_pages_range
+    assert collector._wait_seconds_after_page_change == wait_seconds_after_page_change
 
     time_mock.assert_called_once()
     assert (
@@ -72,7 +79,8 @@ def fixture_nfl_collector():
 
 def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login = MagicMock()
-    nfl_collector._get_seasons = MagicMock(return_value=["2019", "2018"])
+    nfl_collector._get_seasons = MagicMock(return_value=[2019, 2018])
+    nfl_collector._set_season_data = MagicMock()
 
     assert nfl_collector.save_all_data() == League(
         nfl_collector._config.league_id, {}, {}
@@ -80,6 +88,12 @@ def test_save_all_data(nfl_collector: NFLCollector):
 
     nfl_collector._login.assert_called_once()
     nfl_collector._get_seasons.assert_called_once()
+
+    assert nfl_collector._set_season_data.call_args_list[0][0][0] == 2019
+    assert isinstance(nfl_collector._set_season_data.call_args_list[0][0][1], League)
+
+    assert nfl_collector._set_season_data.call_args_list[1][0][0] == 2018
+    assert isinstance(nfl_collector._set_season_data.call_args_list[1][0][1], League)
 
 
 def test_change_page_no_sleep(nfl_collector: NFLCollector):
@@ -100,7 +114,9 @@ def test_change_page_no_sleep(nfl_collector: NFLCollector):
             )
 
     time_mock.assert_has_calls([call()] * 2)
-    sleep_mock.assert_called_once_with(0)
+    sleep_mock.assert_has_calls(
+        [call(0), call(nfl_collector._wait_seconds_after_page_change)]
+    )
 
     assert (
         nfl_collector._last_page_load_time
@@ -138,7 +154,12 @@ def test_change_page_with_sleep(nfl_collector: NFLCollector):
         nfl_collector._time_between_pages_range[1],
     )
     time_mock.assert_has_calls([call()] * 2)
-    sleep_mock.assert_called_once_with(interval - (current_time - last_page_load_time))
+    sleep_mock.assert_has_calls(
+        [
+            call(interval - (current_time - last_page_load_time)),
+            call(nfl_collector._wait_seconds_after_page_change),
+        ]
+    )
 
     assert nfl_collector._last_page_load_time == change_page_time
 
