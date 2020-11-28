@@ -187,6 +187,10 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             )
             league.seasons[year].standings[manager_id] = manager_standing
 
+        # Get games information.
+
+        # Populate league with games information.
+
     def _get_managers(  # pylint: disable=too-many-locals
         self, year: int
     ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
@@ -333,6 +337,13 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         return (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
             f"{year}/teamhome?teamId={team_id}"
+        )
+
+    def _get_week_schedule_url(self, year: int, week: int):
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/schedule?gameSeason={year}&leagueId={self._config.league_id}&"
+            f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
         )
 
     @staticmethod

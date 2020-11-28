@@ -461,3 +461,69 @@ def test_get_seasons(nfl_collector: NFLCollector):
 
     season0_mock.get_attribute.assert_called_once_with("textContent")
     season1_mock.get_attribute.assert_called_once_with("textContent")
+
+
+def test_get_final_standings_url(nfl_collector: NFLCollector):
+    year = 2018
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/standings?historyStandingsType=final"
+    )
+
+    assert nfl_collector._get_final_standings_url(year) == expected_url
+
+
+def test__get_regular_season_standings_url(nfl_collector: NFLCollector):
+    year = 2018
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/standings?historyStandingsType=regular"
+    )
+
+    assert nfl_collector._get_regular_season_standings_url(year) == expected_url
+
+
+def test_get_team_home_url(nfl_collector: NFLCollector):
+    year = 2018
+    team_id = "5"
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/teamhome?teamId={team_id}"
+    )
+
+    assert nfl_collector._get_team_home_url(year, team_id) == expected_url
+
+
+def test_get_week_schedule_url(nfl_collector: NFLCollector):
+    year = 2018
+    week = 3
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/schedule?gameSeason={year}&leagueId={nfl_collector._config.league_id}&"
+        f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
+    )
+
+    assert nfl_collector._get_week_schedule_url(year, week) == expected_url
+
+
+def test_get_team_id_from_link():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"/url/to/something?query=param&teamId={team_id}"
+    )
+
+    assert team_id == NFLCollector._get_team_id_from_link(web_element_mock)
+
+
+def test_get_team_id_from_link_invalid():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"/url/to/something?teamId={team_id}&query=param"
+    )
+
+    with pytest.raises(RuntimeError):
+        NFLCollector._get_team_id_from_link(web_element_mock)
