@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.record import Record
 from collectors.models.roster import Roster
 from utils import CamelCasedDataclass
 
@@ -15,7 +14,6 @@ class TeamGameData(CamelCasedDataclass):
     # Manager lists to accomodate co-managers.
     points: int
     managers: List[str]
-    breakdown_record: Record
     roster: Roster
 
 

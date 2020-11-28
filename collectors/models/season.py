@@ -25,7 +25,6 @@ class RegularSeasonStanding(CamelCasedDataclass):
     points_against: float
 
     record: Record
-    breakdown: Record
 
 
 @dataclass

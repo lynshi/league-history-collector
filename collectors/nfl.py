@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from loguru import logger
 from selenium import webdriver
+from selenium.webdriver.remote.webelement import WebElement
 
 from collectors.base import Configuration, ICollector
 from collectors.models import (
@@ -16,6 +17,7 @@ from collectors.models import (
     Manager,
     ManagerStanding,
     RegularSeasonStanding,
+    Record,
     Season,
 )
 
@@ -198,18 +200,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         team_ids = []
         for team in team_list:
             team_page_link = team.find_element_by_xpath(".//a")
-            team_id = team_page_link.get_attribute("href").split("teamId=")[-1]
-
-            try:
-                _ = int(team_id)
-            except ValueError as e:
-                logger.error(
-                    f"Team ID {team_id} for year {year} does not seem correct (not an integer)"
-                )
-                raise RuntimeError(
-                    f"Could not map team IDs to managers in year {year}"
-                ) from e
-
+            team_id = self._get_team_id_from_link(team_page_link)
             team_ids.append(team_id)
 
         team_to_manager = {}
@@ -229,7 +220,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 manager_id = manager_link.get_attribute("class").split("userId-")[-1]
 
                 team_to_manager[team_id].append(manager_id)
-                managers[manager_id] = Manager(manager_name, [year])
+                managers[manager_id] = Manager(name=manager_name, seasons=[year])
 
                 logger.debug(
                     f"In {year}, found manager {manager_name} for team {team_id}"
@@ -262,18 +253,52 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             place = int(place_str)
 
             team_link = team.find_element_by_class_name("teamName")
-            team_id = team_link.get_attribute("href").split("teamId=")[-1]
+            team_id = self._get_team_id_from_link(team_link)
 
-            manager_id = team_to_manager[team_id]
-            final_standings[manager_id] = FinalStanding(place)
+            managers = team_to_manager[team_id]
+            for manager_id in managers:
+                final_standings[manager_id] = FinalStanding(place)
 
         return final_standings
 
-    def _get_regular_season_standings(
+    def _get_regular_season_standings(  # pylint: disable=too-many-locals
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, RegularSeasonStanding]:
-        _ = self._get_regular_season_standings_url(year)
-        return {}
+        regular_season_standings_url = self._get_regular_season_standings_url(year)
+        self._change_page(self._driver.get, regular_season_standings_url)
+
+        standings = self._driver.find_element_by_id("leagueHistoryStandings")
+
+        # Skip first two table rows which don't have teams.
+        team_rows = standings.find_elements_by_xpath(".//tr")[2:]
+
+        regular_season_standings = {}
+        for team in team_rows:
+            team_link = team.find_element_by_class_name("teamName")
+            team_id = self._get_team_id_from_link(team_link)
+
+            team_rank = int(
+                team.find_element_by_class_name(f"teamRank teamId-{team_id}").text
+            )
+
+            wins, losses, ties = team.find_element_by_class_name(
+                "teamRecord"
+            ).text.split("-")
+            team_record = Record(wins=wins, losses=losses, ties=ties)
+
+            points = team.find_elements_by_class_name("teamPts")
+            points_scored = float(points[0].text)
+            points_against = float(points[1].text)
+
+            for manager_id in team_to_manager[team_id]:
+                regular_season_standings[manager_id] = RegularSeasonStanding(
+                    rank=team_rank,
+                    points_scored=points_scored,
+                    points_against=points_against,
+                    record=team_record,
+                )
+
+        return regular_season_standings
 
     def _get_final_standings_url(self, year: int) -> str:
         return (
@@ -292,3 +317,14 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
             f"{year}/teamhome?teamId={team_id}"
         )
+
+    @staticmethod
+    def _get_team_id_from_link(link: WebElement) -> str:
+        team_id = link.get_attribute("href").split("teamId=")[-1]
+        try:
+            _ = int(team_id)
+        except ValueError as e:
+            logger.error(f"Team ID {team_id} does not seem correct (not an integer)")
+            raise RuntimeError("Could not get team ID") from e
+
+        return team_id
