@@ -412,7 +412,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         team_to_manager: Dict[str, List[str]],
         matchup: Tuple[str, str],
     ) -> Game:
-        matchup_url = self._get_matchup_url(year, week, matchup[0])
+        matchup_url = self._get_matchup_url(year, week, matchup[0], full_box_score=True)
         logger.debug(
             f"Getting game results for {year} Week {week} matchup {matchup} from {matchup_url}"
         )
@@ -442,23 +442,14 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 team_points, team_to_manager[team_id], Roster(starters=[], bench=[])
             )
 
-        rosters = self._get_matchup_rosters(year, week, matchup)
+        rosters = self._get_matchup_rosters(
+            year, week, matchup, full_box_score_loaded=True
+        )
         for team_id in matchup:
             team_data[team_id].roster = rosters[team_id]
 
-        is_tied = False
-        if team_data[matchup[0]].points > team_data[matchup[1]].points:
-            winning_managers = team_data[matchup[0]].managers
-        elif team_data[matchup[0]].points < team_data[matchup[1]].points:
-            winning_managers = team_data[matchup[1]].managers
-        else:
-            is_tied = True
-            winning_managers = []
-
         return Game(
             team_data=list(team_data.values()),
-            winning_managers=winning_managers,
-            tied=is_tied,
         )
 
     def _get_matchup_rosters(  # pylint: disable=too-many-locals
@@ -466,14 +457,18 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         year: int,
         week: int,
         matchup: Tuple[str, str],
+        full_box_score_loaded: Optional[bool] = False,
     ) -> Dict[str, Roster]:
         """Returns a mapping of team ID to roster."""
 
-        full_box_score_url = self._get_matchup_url(
-            year, week, matchup[0], full_box_score=True
-        )
-        logger.debug(f"Getting full box score from {full_box_score_url}")
-        self._change_page(self._driver.get, full_box_score_url)
+        if full_box_score_loaded is False:
+            full_box_score_url = self._get_matchup_url(
+                year, week, matchup[0], full_box_score=True
+            )
+            logger.debug(f"Getting full box score from {full_box_score_url}")
+            self._change_page(self._driver.get, full_box_score_url)
+        else:
+            logger.debug("Getting full box score from current page")
 
         team_matchup_track_dv = self._driver.find_element_by_id("teamMatchupTrack")
         team_wrap_divs = team_matchup_track_dv.find_elements_by_class_name("teamWrap")

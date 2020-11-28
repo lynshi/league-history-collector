@@ -22,8 +22,6 @@ class Game(CamelCasedDataclass):
     """Contains data about a specific game in a week."""
 
     team_data: List[TeamGameData]
-    winning_managers: List[str]
-    tied: bool = False
 
 
 @dataclass

@@ -16,7 +16,7 @@ FLAGS = {
     "GET_SEASONS": False,
     "GET_WEEKS": False,
     "GET_GAME_RESULTS": True,
-    "GET_WEEK_RESULTS": True,
+    "GET_WEEK_RESULTS": False,
 }
 
 

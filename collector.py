@@ -12,7 +12,7 @@ def run_collector(collector_config: NFLConfiguration):
     """Runs a collector on the league specified by the provided configuration."""
 
     with selenium_driver() as driver:
-        collector = NFLCollector(collector_config, driver, (5, 7))
+        collector = NFLCollector(collector_config, driver, (2, 4))
         league_data = collector.save_all_data()
 
         with open("league.json", "w") as outfile:
