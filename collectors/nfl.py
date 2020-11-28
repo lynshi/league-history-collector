@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import random
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from loguru import logger
 from selenium import webdriver
@@ -320,6 +320,26 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 )
 
         return regular_season_standings
+
+    def _get_weeks(self, year: int) -> Set[int]:
+        schedule_url = self._get_week_schedule_url(year, 1)
+        self._change_page(self._driver.get, schedule_url)
+
+        schedule_week_nav = self._driver.find_element_by_class_name("scheduleWeekNav")
+
+        # This is nasty because the spans with the week number don't have classes or id.
+        weeks = set()
+        for list_item in schedule_week_nav.find_elements_by_xpath(".//li"):
+            for span in list_item.find_elements_by_xpath(".//span"):
+                try:
+                    week = int(span.text)
+                    weeks.add(week)
+                except ValueError:
+                    continue
+
+        logger.debug(f"Weeks with games: {weeks}")
+        return weeks
+
 
     def _get_final_standings_url(self, year: int) -> str:
         return (
