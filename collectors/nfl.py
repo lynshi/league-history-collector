@@ -193,12 +193,11 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             )
             league.seasons[year].standings[manager_id] = manager_standing
 
-        # Get games information.
+        # Get and populate games information.
         weeks_in_league = self._get_weeks(year)
         for week in weeks_in_league:
-            pass
-
-        # Populate league with games information.
+            week_data = self._get_games_for_week(year, week, team_to_manager)
+            league.seasons[year].weeks[week] = week_data
 
     def _get_managers(  # pylint: disable=too-many-locals
         self, year: int
@@ -351,7 +350,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
     def _get_games_for_week(  # pylint: disable=too-many-locals
         self, year: int, week: int, team_to_manager: Dict[str, List[str]]
-    ) -> List[Game]:
+    ) -> Week:
         schedule_url = self._get_week_schedule_url(year, 1)
         self._change_page(self._driver.get, schedule_url)
 
@@ -381,7 +380,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 self._get_game_results(year, week, team_to_manager, matchup)
             )
 
-        return game_results
+        return Week(games=game_results)
 
     def _get_game_results(
         self,
