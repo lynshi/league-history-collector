@@ -159,7 +159,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        logger.success("Successfully logged in!")
+        logger.success(f"Successfully logged in to {league_url}!")
 
     def _get_seasons(self) -> List[int]:
         league_history_url = (
@@ -216,6 +216,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int
     ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         final_standings_url = self._get_final_standings_url(year)
+        logger.debug(f"Getting managers for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -234,6 +235,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_to_manager[team_id] = []
 
             team_home_url = self._get_team_home_url(year, team_id)
+            logger.debug(
+                f"Got team home page for team {team_id} in {year} at {team_home_url}"
+            )
             self._change_page(self._driver.get, team_home_url)
 
             team_detail_div = self._driver.find_element_by_id("teamDetail")
@@ -258,6 +262,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, FinalStanding]:
         final_standings_url = self._get_final_standings_url(year)
+        logger.debug(f"Getting final standings for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -294,6 +299,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, RegularSeasonStanding]:
         regular_season_standings_url = self._get_regular_season_standings_url(year)
+        logger.debug(
+            f"Getting regular season standings for {year} from {regular_season_standings_url}"
+        )
         self._change_page(self._driver.get, regular_season_standings_url)
 
         standings = self._driver.find_element_by_id("leagueHistoryStandings")
@@ -344,6 +352,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
     def _get_weeks(self, year: int) -> Set[int]:
         schedule_url = self._get_week_schedule_url(year, 1)
+        logger.debug(f"Getting weeks in {year} from {schedule_url}")
         self._change_page(self._driver.get, schedule_url)
 
         schedule_week_nav = self._driver.find_element_by_class_name("scheduleWeekNav")
@@ -364,7 +373,8 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
     def _get_games_for_week(  # pylint: disable=too-many-locals
         self, year: int, week: int, team_to_manager: Dict[str, List[str]]
     ) -> Week:
-        schedule_url = self._get_week_schedule_url(year, 1)
+        schedule_url = self._get_week_schedule_url(year, week)
+        logger.debug(f"Getting games for week {week} in {year} from {schedule_url}")
         self._change_page(self._driver.get, schedule_url)
 
         schedule_content_div = self._driver.find_element_by_class_name(
@@ -403,6 +413,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         matchup: Tuple[str, str],
     ) -> Game:
         matchup_url = self._get_matchup_url(year, week, matchup[0])
+        logger.debug(
+            f"Getting game results for {year} Week {week} matchup {matchup} from {matchup_url}"
+        )
         self._change_page(self._driver.get, matchup_url)
 
         team_matchup_header = self._driver.find_element_by_id("teamMatchupHeader")
