@@ -281,7 +281,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_link = team.find_element_by_class_name("teamName")
             team_id = self._get_team_id_from_link(team_link)
 
-            possible_rank_spans = team.find_element_by_class_name(f"teamId-{team_id}")
+            possible_rank_spans = team.find_elements_by_class_name(f"teamId-{team_id}")
             team_rank = None
             for span in possible_rank_spans:
                 if "teamRank" in span.get_attribute("class"):
