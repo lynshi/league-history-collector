@@ -483,6 +483,8 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 for table_row in table_rows:
                     is_starter = True
                     try:
+                        # I didn't look closely at how the table rows are done but it's likely
+                        # there are decorative rows.
                         position_td = table_row.find_element_by_class_name(
                             "teamPosition"
                         )
@@ -494,7 +496,15 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                         )
                         continue
 
-                    player_card = table_row.find_element_by_class_name("playerCard")
+                    try:
+                        # Can raise if no starter was plugged in, such as at defense.
+                        player_card = table_row.find_element_by_class_name("playerCard")
+                    except NoSuchElementException:
+                        logger.debug(
+                            "Skipping row which doesn't seem to contain a player"
+                        )
+                        continue
+
                     player_id = self._get_player_id_from_class(player_card)
                     player_name = player_card.text
 
