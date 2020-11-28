@@ -40,14 +40,21 @@ def test_init():
 
     driver_mock = MagicMock()
     time_between_pages_range = (3, 5)
+    wait_seconds_after_page_change = 1
 
     with patch("time.time") as time_mock:
         time_mock.return_value = 42
-        collector = NFLCollector(config, driver_mock, time_between_pages_range)
+        collector = NFLCollector(
+            config,
+            driver_mock,
+            time_between_pages_range,
+            wait_seconds_after_page_change,
+        )
 
     assert collector._config == config
     assert collector._driver == driver_mock
     assert collector._time_between_pages_range == time_between_pages_range
+    assert collector._wait_seconds_after_page_change == wait_seconds_after_page_change
 
     time_mock.assert_called_once()
     assert (
@@ -72,7 +79,8 @@ def fixture_nfl_collector():
 
 def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login = MagicMock()
-    nfl_collector._get_seasons = MagicMock(return_value=["2019", "2018"])
+    nfl_collector._get_seasons = MagicMock(return_value=[2019, 2018])
+    nfl_collector._set_season_data = MagicMock()
 
     assert nfl_collector.save_all_data() == League(
         nfl_collector._config.league_id, {}, {}
@@ -80,6 +88,12 @@ def test_save_all_data(nfl_collector: NFLCollector):
 
     nfl_collector._login.assert_called_once()
     nfl_collector._get_seasons.assert_called_once()
+
+    assert nfl_collector._set_season_data.call_args_list[0][0][0] == 2019
+    assert isinstance(nfl_collector._set_season_data.call_args_list[0][0][1], League)
+
+    assert nfl_collector._set_season_data.call_args_list[1][0][0] == 2018
+    assert isinstance(nfl_collector._set_season_data.call_args_list[1][0][1], League)
 
 
 def test_change_page_no_sleep(nfl_collector: NFLCollector):
@@ -100,7 +114,9 @@ def test_change_page_no_sleep(nfl_collector: NFLCollector):
             )
 
     time_mock.assert_has_calls([call()] * 2)
-    sleep_mock.assert_called_once_with(0)
+    sleep_mock.assert_has_calls(
+        [call(0), call(nfl_collector._wait_seconds_after_page_change)]
+    )
 
     assert (
         nfl_collector._last_page_load_time
@@ -138,7 +154,12 @@ def test_change_page_with_sleep(nfl_collector: NFLCollector):
         nfl_collector._time_between_pages_range[1],
     )
     time_mock.assert_has_calls([call()] * 2)
-    sleep_mock.assert_called_once_with(interval - (current_time - last_page_load_time))
+    sleep_mock.assert_has_calls(
+        [
+            call(interval - (current_time - last_page_load_time)),
+            call(nfl_collector._wait_seconds_after_page_change),
+        ]
+    )
 
     assert nfl_collector._last_page_load_time == change_page_time
 
@@ -241,7 +262,9 @@ def test_login(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(3)
+    sleep_mock.assert_called_once_with(
+        3 - nfl_collector._wait_seconds_after_page_change
+    )
 
 
 def test_login_no_login_button(nfl_collector: NFLCollector):
@@ -432,7 +455,9 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
 
     nfl_collector._change_page.assert_any_call(real_button_mock.click)
 
-    sleep_mock.assert_called_once_with(3)
+    sleep_mock.assert_called_once_with(
+        3 - nfl_collector._wait_seconds_after_page_change
+    )
 
 
 def test_get_seasons(nfl_collector: NFLCollector):
@@ -461,3 +486,150 @@ def test_get_seasons(nfl_collector: NFLCollector):
 
     season0_mock.get_attribute.assert_called_once_with("textContent")
     season1_mock.get_attribute.assert_called_once_with("textContent")
+
+
+def test_get_final_standings_url(nfl_collector: NFLCollector):
+    year = 2018
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/standings?historyStandingsType=final"
+    )
+
+    assert nfl_collector._get_final_standings_url(year) == expected_url
+
+
+def test__get_regular_season_standings_url(nfl_collector: NFLCollector):
+    year = 2018
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/standings?historyStandingsType=regular"
+    )
+
+    assert nfl_collector._get_regular_season_standings_url(year) == expected_url
+
+
+def test_get_team_home_url(nfl_collector: NFLCollector):
+    year = 2018
+    team_id = "5"
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/teamhome?teamId={team_id}"
+    )
+
+    assert nfl_collector._get_team_home_url(year, team_id) == expected_url
+
+
+def test_get_week_schedule_url(nfl_collector: NFLCollector):
+    year = 2018
+    week = 3
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/schedule?gameSeason={year}&leagueId={nfl_collector._config.league_id}&"
+        f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
+    )
+
+    assert nfl_collector._get_week_schedule_url(year, week) == expected_url
+
+
+def test_get_matchup_url(nfl_collector: NFLCollector):
+    year = 2018
+    week = 3
+    team_id = "2"
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/teamgamecenter?teamId={team_id}&week={week}"
+    )
+
+    assert nfl_collector._get_matchup_url(year, week, team_id) == expected_url
+
+
+def test_get_matchup_url_full_box_score(nfl_collector: NFLCollector):
+    year = 2018
+    week = 3
+    team_id = "2"
+    expected_url = (
+        f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}/history/"
+        f"{year}/teamgamecenter?teamId={team_id}&week={week}&trackType=fbs"
+    )
+
+    assert (
+        nfl_collector._get_matchup_url(year, week, team_id, full_box_score=True)
+        == expected_url
+    )
+
+
+def test_get_team_id_from_link():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"/url/to/something?query=param&teamId={team_id}"
+    )
+
+    assert team_id == NFLCollector._get_team_id_from_link(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("href")
+
+
+def test_get_team_id_from_link_invalid():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"/url/to/something?teamId={team_id}&query=param"
+    )
+
+    with pytest.raises(RuntimeError):
+        NFLCollector._get_team_id_from_link(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("href")
+
+
+def test_get_team_id_from_class():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = f"teamTotal teamId-{team_id}"
+
+    assert team_id == NFLCollector._get_team_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")
+
+
+def test_get_team_id_from_class_invalid():
+    team_id = "2"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = f"teamTotal teamId-{team_id}-"
+
+    with pytest.raises(RuntimeError):
+        NFLCollector._get_team_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")
+
+
+def test_get_player_id_from_class():
+    player_id = "100"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"playerNameId-{player_id} somethingElse"
+    )
+
+    assert player_id == NFLCollector._get_player_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")
+
+
+def test_get_player_id_from_class_invalid():
+    player_id = "100"
+
+    web_element_mock = MagicMock()
+    web_element_mock.get_attribute.return_value = (
+        f"playerNameId-{player_id}a somethingElse"
+    )
+
+    with pytest.raises(RuntimeError):
+        NFLCollector._get_player_id_from_class(web_element_mock)
+
+    web_element_mock.get_attribute.assert_called_once_with("class")

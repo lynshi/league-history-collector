@@ -11,5 +11,8 @@ from utils import CamelCasedDataclass
 class Roster(CamelCasedDataclass):
     """Contains data for a roster."""
 
+    # Using Player objects will duplicate ID, name, and position, but this
+    # helps account for position changes between seasons.
+
     starters: List[Player]
     bench: List[Player]

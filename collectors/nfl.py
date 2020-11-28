@@ -4,21 +4,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 import random
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from loguru import logger
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 
 from collectors.base import Configuration, ICollector
 from collectors.models import (
     FinalStanding,
+    Game,
     League,
     Manager,
     ManagerStanding,
+    Player,
     RegularSeasonStanding,
     Record,
+    Roster,
     Season,
+    TeamGameData,
+    Week,
 )
 
 
@@ -51,6 +57,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         config: NFLConfiguration,
         driver: webdriver.Remote,
         time_between_pages_range: Tuple[int, int] = (2, 4),
+        wait_seconds_after_page_change: int = 2,
     ):
         """Create an NFLCollector.
 
@@ -67,6 +74,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         self._driver = driver
         self._time_between_pages_range = time_between_pages_range
+        self._wait_seconds_after_page_change = wait_seconds_after_page_change
 
         # Subtract so first action can occur immediately
         self._last_page_load_time = time.time() - self._time_between_pages_range[1]
@@ -77,7 +85,10 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         league = League(id=self._config.league_id, managers={}, seasons={})
 
         self._login()
-        self._get_seasons()
+
+        seasons = self._get_seasons()
+        for year in seasons:
+            self._set_season_data(year, league)
 
         return league
 
@@ -89,7 +100,14 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         time.sleep(max(0, (interval - (time.time() - self._last_page_load_time))))
         self._last_page_load_time = time.time()
 
-        return action(*args, **kwargs)
+        result = action(*args, **kwargs)
+
+        logger.debug(
+            f"Waiting {self._wait_seconds_after_page_change} seconds after page change"
+        )
+        time.sleep(self._wait_seconds_after_page_change)
+
+        return result
 
     def _login(self):
         login_url = (
@@ -128,11 +146,12 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        sleep_seconds = 3
-        logger.info(
-            f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
-        )
-        time.sleep(sleep_seconds)  # wait for redirect
+        sleep_seconds = 3 - self._wait_seconds_after_page_change
+        if sleep_seconds > 0:
+            logger.info(
+                f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
+            )
+            time.sleep(sleep_seconds)  # wait for redirect
 
         league_url = f"https://fantasy.nfl.com/league/{self._config.league_id}"
         if league_url != self._driver.current_url:
@@ -140,7 +159,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             logger.error(msg)
             raise RuntimeError(msg)
 
-        logger.info("Successfully logged in!")
+        logger.success(f"Successfully logged in to {league_url}!")
 
     def _get_seasons(self) -> List[int]:
         league_history_url = (
@@ -187,10 +206,17 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             )
             league.seasons[year].standings[manager_id] = manager_standing
 
+        # Get and populate games information.
+        weeks_in_league = self._get_weeks(year)
+        for week in weeks_in_league:
+            week_data = self._get_games_for_week(year, week, team_to_manager)
+            league.seasons[year].weeks[week] = week_data
+
     def _get_managers(  # pylint: disable=too-many-locals
         self, year: int
     ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         final_standings_url = self._get_final_standings_url(year)
+        logger.debug(f"Getting managers for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -209,6 +235,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             team_to_manager[team_id] = []
 
             team_home_url = self._get_team_home_url(year, team_id)
+            logger.debug(
+                f"Got team home page for team {team_id} in {year} at {team_home_url}"
+            )
             self._change_page(self._driver.get, team_home_url)
 
             team_detail_div = self._driver.find_element_by_id("teamDetail")
@@ -233,6 +262,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, FinalStanding]:
         final_standings_url = self._get_final_standings_url(year)
+        logger.debug(f"Getting final standings for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -269,6 +299,9 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, RegularSeasonStanding]:
         regular_season_standings_url = self._get_regular_season_standings_url(year)
+        logger.debug(
+            f"Getting regular season standings for {year} from {regular_season_standings_url}"
+        )
         self._change_page(self._driver.get, regular_season_standings_url)
 
         standings = self._driver.find_element_by_id("leagueHistoryStandings")
@@ -317,6 +350,194 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         return regular_season_standings
 
+    def _get_weeks(self, year: int) -> Set[int]:
+        schedule_url = self._get_week_schedule_url(year, 1)
+        logger.debug(f"Getting weeks in {year} from {schedule_url}")
+        self._change_page(self._driver.get, schedule_url)
+
+        schedule_week_nav = self._driver.find_element_by_class_name("scheduleWeekNav")
+
+        # This is nasty because the spans with the week number don't have classes or id.
+        weeks = set()
+        for list_item in schedule_week_nav.find_elements_by_xpath(".//li"):
+            for span in list_item.find_elements_by_xpath(".//span"):
+                try:
+                    week = int(span.text)
+                    weeks.add(week)
+                except ValueError:
+                    continue
+
+        logger.debug(f"Weeks with games: {weeks}")
+        return weeks
+
+    def _get_games_for_week(  # pylint: disable=too-many-locals
+        self, year: int, week: int, team_to_manager: Dict[str, List[str]]
+    ) -> Week:
+        schedule_url = self._get_week_schedule_url(year, week)
+        logger.debug(f"Getting games for week {week} in {year} from {schedule_url}")
+        self._change_page(self._driver.get, schedule_url)
+
+        schedule_content_div = self._driver.find_element_by_class_name(
+            "scheduleContentWrap"
+        )
+        schedule_content = schedule_content_div.find_element_by_class_name(
+            "scheduleContent"
+        )
+        matchup_items = schedule_content.find_elements_by_class_name("matchup")
+
+        matchups = []
+        for matchup_iteam in matchup_items:
+            team_ids = set()
+
+            team_links = matchup_iteam.find_elements_by_class_name("teamName")
+            for team_link in team_links:
+                team_id = self._get_team_id_from_link(team_link)
+                team_ids.add(team_id)
+
+            matchups.append(tuple(team_ids))
+            logger.debug(f"Added matchup {matchups[-1]} for week {week} in {year}")
+
+        game_results = []
+        for matchup in matchups:
+            game_results.append(
+                self._get_game_results(year, week, team_to_manager, matchup)
+            )
+
+        return Week(games=game_results)
+
+    def _get_game_results(
+        self,
+        year: int,
+        week: int,
+        team_to_manager: Dict[str, List[str]],
+        matchup: Tuple[str, str],
+    ) -> Game:
+        matchup_url = self._get_matchup_url(year, week, matchup[0], full_box_score=True)
+        logger.debug(
+            f"Getting game results for {year} Week {week} matchup {matchup} from {matchup_url}"
+        )
+        self._change_page(self._driver.get, matchup_url)
+
+        team_matchup_header = self._driver.find_element_by_id("teamMatchupHeader")
+        team_total_divs = team_matchup_header.find_elements_by_class_name("teamTotal")
+
+        if len(team_total_divs) != 2:
+            raise RuntimeError(f"Expected 2 team totals, got {len(team_total_divs)}")
+
+        # Get points and copy team manager list first.
+        team_data = {}
+        for team_total in team_total_divs:
+            team_id = self._get_team_id_from_class(team_total)
+            if team_id not in matchup:
+                raise RuntimeError(
+                    f"Unexpected team ID {team_id} for matchup {matchup}"
+                )
+
+            team_points = float(team_total.text)
+            logger.debug(
+                f"Team {team_id} scored {team_points} in week {week} of {year}."
+            )
+
+            team_data[team_id] = TeamGameData(
+                team_points, team_to_manager[team_id], Roster(starters=[], bench=[])
+            )
+
+        rosters = self._get_matchup_rosters(
+            year, week, matchup, full_box_score_loaded=True
+        )
+        for team_id in matchup:
+            team_data[team_id].roster = rosters[team_id]
+
+        return Game(
+            team_data=list(team_data.values()),
+        )
+
+    def _get_matchup_rosters(  # pylint: disable=too-many-locals
+        self,
+        year: int,
+        week: int,
+        matchup: Tuple[str, str],
+        full_box_score_loaded: Optional[bool] = False,
+    ) -> Dict[str, Roster]:
+        """Returns a mapping of team ID to roster."""
+
+        if full_box_score_loaded is False:
+            full_box_score_url = self._get_matchup_url(
+                year, week, matchup[0], full_box_score=True
+            )
+            logger.debug(f"Getting full box score from {full_box_score_url}")
+            self._change_page(self._driver.get, full_box_score_url)
+        else:
+            logger.debug("Getting full box score from current page")
+
+        team_matchup_track_dv = self._driver.find_element_by_id("teamMatchupTrack")
+        team_wrap_divs = team_matchup_track_dv.find_elements_by_class_name("teamWrap")
+
+        # The team selected by `team_id` is first in the box score table and `team_wrap_divs`.
+        # This corresponds to the team identified by`matchup[0]`.
+
+        rosters = {
+            matchup[0]: Roster(starters=[], bench=[]),
+            matchup[1]: Roster(starters=[], bench=[]),
+        }
+
+        for team_idx, team_wrap_div in enumerate(team_wrap_divs):
+            roster_tables = team_wrap_div.find_elements_by_xpath(".//tbody")
+
+            # Position players, Kicker, Defense
+            for table in roster_tables:
+                table_rows = table.find_elements_by_xpath(".//tr")
+
+                for table_row in table_rows:
+                    is_starter = True
+                    try:
+                        # I didn't look closely at how the table rows are done but it's likely
+                        # there are decorative rows.
+                        position_td = table_row.find_element_by_class_name(
+                            "teamPosition"
+                        )
+                        if position_td.find_element_by_xpath("span").text == "BN":
+                            is_starter = False
+                    except NoSuchElementException:
+                        logger.debug(
+                            "Skipping row which doesn't seem to contain a player"
+                        )
+                        continue
+
+                    try:
+                        # Can raise if no starter was plugged in, such as at defense.
+                        player_card = table_row.find_element_by_class_name("playerCard")
+                    except NoSuchElementException:
+                        logger.debug(
+                            "Skipping row which doesn't seem to contain a player"
+                        )
+                        continue
+
+                    player_id = self._get_player_id_from_class(player_card)
+                    player_name = player_card.text
+
+                    player_name_and_info = table_row.find_element_by_class_name(
+                        "playerNameAndInfo"
+                    )
+                    c_class = player_name_and_info.find_element_by_class_name("c")
+                    player_position = c_class.text.split(" - ")[0].split("\n")[-1]
+
+                    player = Player(
+                        id=player_id, name=player_name, position=player_position
+                    )
+
+                    text_mod = "starter" if is_starter is True else "bench player"
+                    logger.debug(
+                        f"Found {text_mod} {player.to_json()} for team {matchup[team_idx]}"
+                    )
+
+                    if is_starter:
+                        rosters[matchup[team_idx]].starters.append(player)
+                    else:
+                        rosters[matchup[team_idx]].bench.append(player)
+
+        return rosters
+
     def _get_final_standings_url(self, year: int) -> str:
         return (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
@@ -335,13 +556,66 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             f"{year}/teamhome?teamId={team_id}"
         )
 
+    def _get_week_schedule_url(self, year: int, week: int):
+        return (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/schedule?gameSeason={year}&leagueId={self._config.league_id}&"
+            f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
+        )
+
+    def _get_matchup_url(
+        self, year: int, week: int, team_id: str, full_box_score: bool = False
+    ) -> str:
+        matchup_url = (
+            f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
+            f"{year}/teamgamecenter?teamId={team_id}&week={week}"
+        )
+
+        if full_box_score is True:
+            matchup_url += "&trackType=fbs"
+
+        return matchup_url
+
     @staticmethod
     def _get_team_id_from_link(link: WebElement) -> str:
-        team_id = link.get_attribute("href").split("teamId=")[-1]
+        href_attribute = link.get_attribute("href")
+        team_id = href_attribute.split("teamId=")[-1]
         try:
             _ = int(team_id)
         except ValueError as e:
             logger.error(f"Team ID {team_id} does not seem correct (not an integer)")
-            raise RuntimeError("Could not get team ID") from e
+            raise RuntimeError(
+                f"Could not get team ID from `href` attribute: {href_attribute}"
+            ) from e
 
         return team_id
+
+    @staticmethod
+    def _get_team_id_from_class(element: WebElement) -> str:
+        class_attribute = element.get_attribute("class")
+        team_id = class_attribute.split("teamId-")[-1]
+        try:
+            _ = int(team_id)
+        except ValueError as e:
+            logger.error(f"Team ID {team_id} does not seem correct (not an integer)")
+            raise RuntimeError(
+                f"Could not get team ID from `class` attribute: {class_attribute}"
+            ) from e
+
+        return team_id
+
+    @staticmethod
+    def _get_player_id_from_class(element: WebElement) -> str:
+        class_attribute = element.get_attribute("class")
+        player_id = class_attribute.split("playerNameId-")[-1].split(" ")[0]
+        try:
+            _ = int(player_id)
+        except ValueError as e:
+            logger.error(
+                f"Player ID {player_id} does not seem correct (not an integer)"
+            )
+            raise RuntimeError(
+                f"Could not get player ID from `class` attribute: {class_attribute}"
+            ) from e
+
+        return player_id

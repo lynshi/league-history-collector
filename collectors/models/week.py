@@ -12,7 +12,7 @@ class TeamGameData(CamelCasedDataclass):
     """Contains data about a team's performance in a game."""
 
     # Manager lists to accomodate co-managers.
-    points: int
+    points: float
     managers: List[str]
     roster: Roster
 
@@ -22,8 +22,6 @@ class Game(CamelCasedDataclass):
     """Contains data about a specific game in a week."""
 
     team_data: List[TeamGameData]
-    winning_managers: List[str]
-    tied: bool = False
 
 
 @dataclass

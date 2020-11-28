@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Change these parameter values for your project.
-MAIN="test_script.py"
+MAIN="collector.py test_script.py"
 PACKAGES="collectors"
 MINIMUM_CODE_COVERAGE=50
 UNIT_TEST_DIRECTORY="test"
