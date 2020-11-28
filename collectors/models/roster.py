@@ -3,8 +3,16 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.base import CamelCasedDataclass
-from collectors.models.player import Player
+from utils import CamelCasedDataclass
+
+
+@dataclass
+class Player(CamelCasedDataclass):
+    """Contains data for a player."""
+
+    id: str
+    name: str
+    position: str
 
 
 @dataclass

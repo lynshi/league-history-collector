@@ -24,7 +24,7 @@ if __name__ == "__main__":
         seasons = collector._get_seasons()
         logger.info(f"The following seasons are present in league history: {seasons}")
 
-        league = League(id=config.league_id)
+        league = League(id=config.league_id, managers={}, seasons={})
         collector._set_season_data(2019, league)
 
         print(json.dumps(league.to_dict(), sort_keys=True, indent=4))

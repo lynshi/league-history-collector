@@ -10,7 +10,7 @@ from loguru import logger
 from selenium import webdriver
 
 from collectors.base import Configuration, ICollector
-from collectors.models import League, Manager, Season
+from collectors.models import League, Manager
 
 
 @dataclass
@@ -152,13 +152,14 @@ class NFLCollector(ICollector):
         return seasons
 
     def _set_season_data(self, year: int, league: League):
-        team_to_manager = self._set_managers(year, league)
-        self._set_final_standings(year, team_to_manager, league)
-        self._set_regular_season_results(year, team_to_manager, league)
+        team_to_manager = self._get_managers(year, league)
+        return
+        self._get_final_standings(year, team_to_manager)
+        self._get_regular_season_results(year, team_to_manager)
 
-    def _set_managers(  # pylint: disable=too-many-locals
+    def _get_managers(  # pylint: disable=too-many-locals
         self, year: int, league: League
-    ) -> Dict[str, List[str]]:
+    ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         final_standings_url = self._get_final_standings_url(year)
         self._change_page(self._driver.get, final_standings_url)
 
@@ -210,17 +211,15 @@ class NFLCollector(ICollector):
         )
         return team_to_manager
 
-    def _set_final_standings(
-        self, year: int, team_to_manager: Dict[str, List[str]], league: League
-    ):
+    def _get_final_standings(  # pylint: disable=too-many-locals
+        self, year: int, team_to_manager: Dict[str, List[str]]
+    ) -> Dict[str, int]:
         final_standings_url = self._get_final_standings_url(year)
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
         results_div = standings_div.find_element_by_class_name("results")
         team_list = results_div.find_elements_by_xpath(".//li")
-
-        manager_final_ranks = {}
 
         for team in team_list:
             place_div = team.find_element_by_class_name("place")
@@ -234,8 +233,14 @@ class NFLCollector(ICollector):
 
             place = int(place_str)
 
-    def _set_regular_season_results(
-        self, year: str, team_to_manager: Dict[str, List[str]], league: League
+            team_link = team.find_element_by_class_name("teamName")
+            team_id = team_link.get_attribute("href").split("teamId=")[-1]
+
+            manager_id = team_to_manager[team_id]
+            manager_season = league.managers[manager_id]
+
+    def _get_regular_season_results(
+        self, year: str, team_to_manager: Dict[str, List[str]]
     ):
         regular_season_standings_url = self._get_regular_season_standings_url(year)
 

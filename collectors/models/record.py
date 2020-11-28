@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from collectors.models.base import CamelCasedDataclass
+from utils import CamelCasedDataclass
 
 
 @dataclass
