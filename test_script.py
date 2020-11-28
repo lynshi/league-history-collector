@@ -46,7 +46,9 @@ if __name__ == "__main__":
 
         if FLAGS["GET_SEASONS"]:
             seasons = collector._get_seasons()
-            logger.info(f"The following seasons are present in league history: {seasons}")
+            logger.info(
+                f"The following seasons are present in league history: {seasons}"
+            )
 
         if FLAGS["GET_WEEKS"]:
             weeks = collector._get_weeks(2019)
@@ -62,4 +64,4 @@ if __name__ == "__main__":
             game_results = collector._get_game_results(
                 2019, 1, team_to_manager, ("2", "4")
             )
-            # logger.info(f"2019 Week 1:\n{game_results.to_json()}")
+            logger.info(f"2019 Week 1:\n{game_results.to_json()}")

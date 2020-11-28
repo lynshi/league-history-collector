@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from loguru import logger
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 
 from collectors.base import Configuration, ICollector
@@ -17,6 +18,7 @@ from collectors.models import (
     League,
     Manager,
     ManagerStanding,
+    Player,
     RegularSeasonStanding,
     Record,
     Roster,
@@ -407,25 +409,106 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 )
 
             team_points = float(team_total.text)
-            logger.debug(f"Team {team_id} scored {team_points} in week {week} of {year}.")
+            logger.debug(
+                f"Team {team_id} scored {team_points} in week {week} of {year}."
+            )
 
             team_data[team_id] = TeamGameData(
                 team_points, team_to_manager[team_id], Roster(starters=[], bench=[])
             )
-        
-        team_matchup_track = self._driver.find_element_by_id("teamMatchupTrack")
-        team_matchup_type_nav = team_matchup_track.find_element_by_class_name("teamMatchupTypeNav")
-        full_box_score_tab = team_matchup_type_nav.find_element_by_link_text("Full Box Score")
-        
-        self._change_page(full_box_score_tab.click)
 
-        sleep_seconds = 3
-        logger.info(f"Sleeping {sleep_seconds} seconds to wait for change to 'Full Box Score' tab.")
-        time.sleep(sleep_seconds)
+        rosters = self._get_matchup_rosters(year, week, matchup)
+        for team_id in matchup:
+            team_data[team_id].roster = rosters[team_id]
 
-        self._driver.save_screenshot("game.png")
+        is_tied = False
+        if team_data[matchup[0]].points > team_data[matchup[1]].points:
+            winning_managers = team_data[matchup[0]].managers
+        elif team_data[matchup[0]].points < team_data[matchup[1]].points:
+            winning_managers = team_data[matchup[1]].managers
+        else:
+            is_tied = True
+            winning_managers = []
 
-        return None
+        return Game(
+            team_data=list(team_data.values()),
+            winning_managers=winning_managers,
+            tied=is_tied,
+        )
+
+    def _get_matchup_rosters(  # pylint: disable=too-many-locals
+        self,
+        year: int,
+        week: int,
+        matchup: Tuple[str, str],
+    ) -> Dict[str, Roster]:
+        """Returns a mapping of team ID to roster."""
+
+        full_box_score_url = self._get_matchup_url(
+            year, week, matchup[0], full_box_score=True
+        )
+        logger.debug(f"Getting full box score from {full_box_score_url}")
+        self._change_page(self._driver.get, full_box_score_url)
+
+        team_matchup_track_dv = self._driver.find_element_by_id("teamMatchupTrack")
+        team_wrap_divs = team_matchup_track_dv.find_elements_by_class_name("teamWrap")
+
+        # The team selected by `team_id` is first in the box score table and `team_wrap_divs`.
+        # This corresponds to the team identified by`matchup[0]`.
+
+        table_bodies = team_wrap_divs.find_element_by_xpath(".//tbody")
+
+        # Position players, Kicker, Defense
+        first_team_roster_tables = table_bodies[:3]
+        second_team_roster_tables = table_bodies[3:]
+
+        rosters = {
+            matchup[0]: Roster(starters=[], bench=[]),
+            matchup[1]: Roster(starters=[], bench=[]),
+        }
+
+        for team_idx, roster_table in enumerate(
+            [first_team_roster_tables, second_team_roster_tables]
+        ):
+            for table in roster_table:
+                table_rows = table.find_elements_by_xpath(".//tr")
+
+                for table_row in table_rows:
+                    is_starter = True
+                    try:
+                        position_td = table_row.find_element_by_class_name(
+                            "teamPosition"
+                        )
+                        if position_td.find_element_by_xpath("span").text == "BN":
+                            is_starter = False
+                    except NoSuchElementException:
+                        logger.debug(
+                            "Skipping row which doesn't seem to contain a player"
+                        )
+                        continue
+
+                    player_card = table_row.find_elements_by_class_name("playerCard")
+                    player_id = self._get_player_id_from_class(player_card)
+                    player_name = player_card.text
+                    player_position = table_row.find_element_by_xpath("em").text.split(
+                        " - "
+                    )[0]
+
+                    player = Player(
+                        id=player_id, name=player_name, position=player_position
+                    )
+
+                    text_mod = "starter" if is_starter is True else "bench player"
+                    logger.debug(
+                        f"Found {text_mod} {player.to_json()} for team {matchup[team_idx]}"
+                    )
+
+                    if is_starter:
+                        rosters[matchup[team_idx]].starters.append(player)
+                    else:
+                        rosters[matchup[team_idx]].bench.append(player)
+
+        return rosters
 
     def _get_final_standings_url(self, year: int) -> str:
         return (
@@ -452,11 +535,18 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             f"scheduleDetail={week}&scheduleType=week&standingsTab=schedule"
         )
 
-    def _get_matchup_url(self, year: int, week: int, team_id: str) -> str:
-        return (
+    def _get_matchup_url(
+        self, year: int, week: int, team_id: str, full_box_score: bool = False
+    ) -> str:
+        matchup_url = (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history/"
             f"{year}/teamgamecenter?teamId={team_id}&week={week}"
         )
+
+        if full_box_score is True:
+            matchup_url += "&trackType=fbs"
+
+        return matchup_url
 
     @staticmethod
     def _get_team_id_from_link(link: WebElement) -> str:
@@ -485,3 +575,19 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             ) from e
 
         return team_id
+
+    @staticmethod
+    def _get_player_id_from_class(element: WebElement) -> str:
+        class_attribute = element.get_attribute("class")
+        player_id = class_attribute.split("playerNameId-")[-1].split(" ")[0]
+        try:
+            _ = int(player_id)
+        except ValueError as e:
+            logger.error(
+                f"Player ID {player_id} does not seem correct (not an integer)"
+            )
+            raise RuntimeError(
+                f"Could not get player ID from `class` attribute: {class_attribute}"
+            ) from e
+
+        return player_id
