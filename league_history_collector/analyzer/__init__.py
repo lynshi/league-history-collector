@@ -1,3 +1,3 @@
 """Module for analyzing collecting data and emitting JSON."""
 
-from analyzer import models
+from league_history_collector.analyzer import models

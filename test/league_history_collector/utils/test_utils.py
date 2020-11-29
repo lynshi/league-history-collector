@@ -4,7 +4,7 @@ from dataclasses_json import LetterCase
 from dataclasses_json import config as dataclasses_json_config
 from stringcase import camelcase
 
-from utils import CamelCasedDataclass
+from league_history_collector.utils import CamelCasedDataclass
 
 
 def test_CamelCasedDataclass():

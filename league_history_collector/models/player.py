@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from utils import CamelCasedDataclass
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass

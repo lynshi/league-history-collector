@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from collectors import NFLCollector, NFLConfiguration
-from collectors.models import League
+from league_history_collector.collectors import NFLCollector, NFLConfiguration
+from league_history_collector.collectors.models import League
 
 
 def test_NFLConfiguration_load():

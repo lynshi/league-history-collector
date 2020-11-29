@@ -3,12 +3,14 @@
 from dataclasses import dataclass
 from typing import Dict
 
-from analyzer.models.record import Record
-from utils import CamelCasedDataclass
+from league_history_collector.models import Record
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
-class LeagueSummary(CamelCasedDataclass):  # pylint: disable=too-many-instance-attributes
+class LeagueSummary(
+    CamelCasedDataclass
+):  # pylint: disable=too-many-instance-attributes
     """League data totals."""
 
     # Playoff stats

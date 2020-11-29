@@ -5,9 +5,9 @@ from contextlib import contextmanager
 import selenium.webdriver as webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
-from collectors import models
-from collectors.base import Configuration, ICollector
-from collectors.nfl import NFLCollector, NFLConfiguration
+from league_history_collector.collectors import models
+from league_history_collector.collectors.base import Configuration, ICollector
+from league_history_collector.collectors.nfl import NFLCollector, NFLConfiguration
 
 
 @contextmanager

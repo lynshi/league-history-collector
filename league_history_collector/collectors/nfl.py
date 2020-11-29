@@ -11,20 +11,22 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 
-from collectors.base import Configuration, ICollector
-from collectors.models import (
+from league_history_collector.collectors.base import Configuration, ICollector
+from league_history_collector.collectors.models import (
     FinalStanding,
-    Game,
     League,
     Manager,
     ManagerStanding,
-    Player,
     RegularSeasonStanding,
+    Season,
+    Week,
+)
+from league_history_collector.models import (
+    Game,
+    Player,
     Record,
     Roster,
-    Season,
     TeamGameData,
-    Week,
 )
 
 

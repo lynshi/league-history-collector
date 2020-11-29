@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.roster import Roster
-from utils import CamelCasedDataclass
+from league_history_collector.models.roster import Roster
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
@@ -22,10 +22,3 @@ class Game(CamelCasedDataclass):
     """Contains data about a specific game in a week."""
 
     team_data: List[TeamGameData]
-
-
-@dataclass
-class Week(CamelCasedDataclass):
-    """Contains data for a single week."""
-
-    games: List[Game]

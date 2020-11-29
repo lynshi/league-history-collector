@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from utils import CamelCasedDataclass
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass

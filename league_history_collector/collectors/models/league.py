@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Dict
 
-from collectors.models.manager import Manager
-from collectors.models.season import Season
-from utils import CamelCasedDataclass
+from league_history_collector.collectors.models.manager import Manager
+from league_history_collector.collectors.models.season import Season
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
