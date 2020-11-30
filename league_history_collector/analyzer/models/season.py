@@ -17,3 +17,5 @@ class Season(CamelCasedDataclass):
 
     playoff_teams = List[str]
     regular_season_standings: Dict[str, int]
+    regular_season_points_for: Dict[str, float]
+    regular_season_points_again: Dict[str, float]
