@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Dict
 
-from collectors.models.record import Record
-from collectors.models.week import Week
-from utils import CamelCasedDataclass
+from league_history_collector.models import Record
+from league_history_collector.collectors.models.week import Week
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass

@@ -7,8 +7,12 @@ import sys
 
 from loguru import logger
 
-from collectors import NFLCollector, NFLConfiguration, selenium_driver
-from collectors.models import League
+from league_history_collector.collectors import (
+    NFLCollector,
+    NFLConfiguration,
+    selenium_driver,
+)
+from league_history_collector.collectors.models import League
 
 
 FLAGS = {

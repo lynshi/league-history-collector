@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import List
 
-from collectors.models.player import Player
-from utils import CamelCasedDataclass
+from league_history_collector.models.player import Player
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass

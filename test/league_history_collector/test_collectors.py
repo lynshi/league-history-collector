@@ -4,15 +4,20 @@ from unittest.mock import MagicMock, patch
 
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
-from collectors import selenium_driver
+from league_history_collector.collectors import selenium_driver
 
 # test module exports
 # pylint: disable=unused-import
-from collectors import Configuration, ICollector, NFLCollector, NFLConfiguration
+from league_history_collector.collectors import (
+    Configuration,
+    ICollector,
+    NFLCollector,
+    NFLConfiguration,
+)
 
 
 def test_selenium_driver_no_kwargs():
-    with patch("collectors.webdriver") as webdriver_mock:
+    with patch("league_history_collector.collectors.webdriver") as webdriver_mock:
         driver_mock = MagicMock()
         webdriver_mock.Remote.return_value = driver_mock
 
@@ -27,7 +32,7 @@ def test_selenium_driver_no_kwargs():
 
 
 def test_selenium_driver_with_kwargs():
-    with patch("collectors.webdriver") as webdriver_mock:
+    with patch("league_history_collector.collectors.webdriver") as webdriver_mock:
         driver_mock = MagicMock()
         webdriver_mock.Remote.return_value = driver_mock
 
@@ -46,7 +51,7 @@ def test_selenium_driver_with_kwargs():
 
 
 def test_selenium_driver_driver_is_None():
-    with patch("collectors.webdriver") as webdriver_mock:
+    with patch("league_history_collector.collectors.webdriver") as webdriver_mock:
         webdriver_mock.Remote.return_value = None
 
         with selenium_driver() as driver:

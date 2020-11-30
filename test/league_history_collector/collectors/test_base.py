@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from collectors import Configuration
+from league_history_collector.collectors import Configuration
 
 
 def test_Configuration_load():

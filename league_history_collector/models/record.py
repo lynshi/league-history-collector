@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass
 
-from utils import CamelCasedDataclass
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
 class Record(CamelCasedDataclass):
-    """Encapsulates a record, which is wins-losses-ties."""
+    """Represents a record, which is wins-losses-ties."""
 
     wins: int
     losses: int

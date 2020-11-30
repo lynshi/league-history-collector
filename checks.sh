@@ -2,7 +2,7 @@
 
 # Change these parameter values for your project.
 MAIN="collector.py test_script.py"
-PACKAGES="collectors"
+PACKAGES="league_history_collector"
 MINIMUM_CODE_COVERAGE=50
 UNIT_TEST_DIRECTORY="test"
 

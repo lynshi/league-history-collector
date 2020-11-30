@@ -11,20 +11,22 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 
-from collectors.base import Configuration, ICollector
-from collectors.models import (
+from league_history_collector.collectors.base import Configuration, ICollector
+from league_history_collector.collectors.models import (
     FinalStanding,
-    Game,
     League,
     Manager,
     ManagerStanding,
-    Player,
     RegularSeasonStanding,
+    Season,
+    Week,
+)
+from league_history_collector.models import (
+    Game,
+    Player,
     Record,
     Roster,
-    Season,
     TeamGameData,
-    Week,
 )
 
 
@@ -148,7 +150,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         sleep_seconds = 3 - self._wait_seconds_after_page_change
         if sleep_seconds > 0:
-            logger.info(
+            logger.debug(
                 f"Sleeping for {sleep_seconds} seconds before checking to make sure we're logged in"
             )
             time.sleep(sleep_seconds)  # wait for redirect
@@ -216,7 +218,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int
     ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         final_standings_url = self._get_final_standings_url(year)
-        logger.debug(f"Getting managers for {year} from {final_standings_url}")
+        logger.info(f"Getting managers for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -262,7 +264,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, FinalStanding]:
         final_standings_url = self._get_final_standings_url(year)
-        logger.debug(f"Getting final standings for {year} from {final_standings_url}")
+        logger.info(f"Getting final standings for {year} from {final_standings_url}")
         self._change_page(self._driver.get, final_standings_url)
 
         standings_div = self._driver.find_element_by_id("finalStandings")
@@ -299,7 +301,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, RegularSeasonStanding]:
         regular_season_standings_url = self._get_regular_season_standings_url(year)
-        logger.debug(
+        logger.info(
             f"Getting regular season standings for {year} from {regular_season_standings_url}"
         )
         self._change_page(self._driver.get, regular_season_standings_url)
@@ -352,7 +354,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
     def _get_weeks(self, year: int) -> Set[int]:
         schedule_url = self._get_week_schedule_url(year, 1)
-        logger.debug(f"Getting weeks in {year} from {schedule_url}")
+        logger.info(f"Getting weeks in {year} from {schedule_url}")
         self._change_page(self._driver.get, schedule_url)
 
         schedule_week_nav = self._driver.find_element_by_class_name("scheduleWeekNav")
@@ -374,7 +376,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         self, year: int, week: int, team_to_manager: Dict[str, List[str]]
     ) -> Week:
         schedule_url = self._get_week_schedule_url(year, week)
-        logger.debug(f"Getting games for week {week} in {year} from {schedule_url}")
+        logger.info(f"Getting games for week {week} in {year} from {schedule_url}")
         self._change_page(self._driver.get, schedule_url)
 
         schedule_content_div = self._driver.find_element_by_class_name(
@@ -413,7 +415,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         matchup: Tuple[str, str],
     ) -> Game:
         matchup_url = self._get_matchup_url(year, week, matchup[0], full_box_score=True)
-        logger.debug(
+        logger.info(
             f"Getting game results for {year} Week {week} matchup {matchup} from {matchup_url}"
         )
         self._change_page(self._driver.get, matchup_url)
@@ -465,7 +467,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             full_box_score_url = self._get_matchup_url(
                 year, week, matchup[0], full_box_score=True
             )
-            logger.debug(f"Getting full box score from {full_box_score_url}")
+            logger.info(f"Getting full box score from {full_box_score_url}")
             self._change_page(self._driver.get, full_box_score_url)
         else:
             logger.debug("Getting full box score from current page")

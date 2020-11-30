@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import json
 from typing import Optional
 
-from collectors.models import League
-from utils import CamelCasedDataclass
+from league_history_collector.collectors.models import League
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
