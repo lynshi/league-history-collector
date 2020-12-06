@@ -209,19 +209,15 @@ class Transformer:
             )
             return
 
-        self._set_base_models()
+        self._set_games_and_h2h()
+        self._set_managers()
 
         self._transformed = True
 
-    def _set_base_models(self):  # pylint: disable=too-many-locals
-        managers_result = {"managers": {}}
+    def _set_games_and_h2h(self):  # pylint: disable=too-many-locals
         head_to_head_result = {"matchups": {}}
         for _, manager in self._data.managers.items():
             head_to_head_result["matchups"][manager.name] = {}
-
-            managers_result["managers"][manager.name] = {"seasons": {}}
-            for year in manager.seasons:
-                managers_result["managers"][manager.name]["seasons"][year] = {}
 
         for manager_name in head_to_head_result["matchups"]:
             for mname in head_to_head_result["matchups"]:
@@ -236,13 +232,10 @@ class Transformer:
                 games_result=games_result,
             )
 
-            self._populate_manager_results(year, season.standings, managers_result)
-
         self._games = transformer_models.Games.from_dict(games_result)
         self._head_to_head = transformer_models.HeadToHead.from_dict(
             head_to_head_result
         )
-        self._managers = transformer_models.Managers.from_dict(managers_result)
 
     def _get_name_for_manager_id(self, team_id: str) -> str:
         return self._data.managers[team_id].name
@@ -289,23 +282,39 @@ class Transformer:
                             first_manager
                         ].append((year, week_num))
 
+    def _set_managers(self):
+        managers_result = {"managers": {}}
+        for _, manager in self._data.managers.items():
+            managers_result["managers"][manager.name] = {"seasons": {}}
+            for year in manager.seasons:
+                managers_result["managers"][manager.name]["seasons"][year] = {}
+
+        for year, season in self._data.seasons.items():
+            self._populate_manager_results(
+                year, season.standings, managers_result, self._games
+            )
+
+        self._managers = transformer_models.Managers.from_dict(managers_result)
+
     def _populate_manager_results(
         self,
         year: int,
         standings: Dict[str, collector_models.ManagerStanding],
         managers_result: Dict,
+        games: transformer_models.Games,
     ):
         for mid, standing in standings.items():
             manager_name = self._get_name_for_manager_id(mid)
             made_playoffs = self._config.is_in_playoffs(
                 manager_name, rank=standing.regular_season_standing.rank, season=year
             )
+            playoff_weeks = self._config.playoff_weeks_for_season(year)
 
             managers_result["managers"][manager_name]["seasons"][year] = {
                 "year": year,
                 "madePlayoffs": made_playoffs,
-                "playoffGames": self._config.playoff_weeks_for_season(year),
-                "playoffRecord": shared_models.Record()
+                "playoffGames": playoff_weeks,
+                "playoffRecord": shared_models.Record(),
             }
 
 
