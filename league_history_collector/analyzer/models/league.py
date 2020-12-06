@@ -13,14 +13,15 @@ class LeagueSummary(
 ):  # pylint: disable=too-many-instance-attributes
     """League data totals."""
 
-    # Playoff stats
-    average_final_standing: Dict[str, float]
-    champions: Dict[int, str]
-    total_playoff_record: Dict[str, Record]
-
     # Regular season stats
-    average_regular_season_standing: Dict[str, float]
+    regular_season_standings: Dict[str, Dict[int, int]]
     seasons_played: Dict[str, int]
-    total_playoff_appearances: Dict[str, int]
-    total_regular_season_record: Dict[str, Record]
     total_regular_season_points_scored: Dict[str, float]
+    total_regular_season_record: Dict[str, Record]
+
+    # Playoff stats
+    champions: Dict[int, str]
+    final_standings: Dict[str, Dict[int, int]]
+    total_playoff_appearances: Dict[str, int]
+    total_playoff_points_scored: Dict[str, float]
+    total_playoff_record: Dict[str, Record]
