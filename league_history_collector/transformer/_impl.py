@@ -317,6 +317,15 @@ class Transformer:
                 "playoffRecord": shared_models.Record(),
             }
 
+    def _compute_playoff_record(
+        self,
+        year: int,
+        playoff_weeks: List[int],
+        manager_name: str,
+        games: transformer_models.Games,
+    ) -> shared_models.Record:
+        return shared_models.Record(0, 0, 0)
+
 
 # year: int  # useful for pandas
 
