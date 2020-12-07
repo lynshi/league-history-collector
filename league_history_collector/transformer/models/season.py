@@ -18,3 +18,10 @@ class Season(CamelCasedDataclass):  # pylint: disable=too-many-instance-attribut
 
     playoff_teams = List[str]
     final_standings: Dict[str, int]
+
+
+@dataclass
+class Seasons(CamelCasedDataclass):
+    """Stores statistics for all seasons."""
+
+    seasons: Dict[int, Season]
