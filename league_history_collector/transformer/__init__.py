@@ -2,4 +2,4 @@
 
 from league_history_collector.transformer import models
 
-from league_history_collector.transformer._impl import *
+from league_history_collector.transformer._impl import Configuration, Transformer

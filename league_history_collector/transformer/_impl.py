@@ -28,7 +28,7 @@ class Configuration(CamelCasedDataclass):
     # to teams in the playoffs are ignored.
     playoff_teams: Dict[int, List[str]] = field(default_factory=dict)
 
-    def is_in_playoffs(self, manager_id: str, rank: int, season: int) -> bool:
+    def is_in_playoffs(self, manager_id: str, *, rank: int, season: int) -> bool:
         """Returns whether the manager made the playoffs for the
         specified season."""
 
@@ -36,9 +36,13 @@ class Configuration(CamelCasedDataclass):
         if manager_id in playoff_teams:
             return True
 
+        if len(playoff_teams) > 0:
+            return False
+
         num_playoff_teams = self.num_playoff_teams_by_season.get(
             season, self.num_playoff_teams
         )
+
         return rank <= num_playoff_teams
 
 
@@ -65,22 +69,47 @@ class Transformer:
         self._config = config
         self._data = deepcopy(league_data)
 
+        seen_names = {}
         if anonymizer is not None:
             anonymized = {}
             for manager_id, manager in self._data.managers.items():
-                anonymized[manager_id] = Manager(
-                    anonymizer(manager.name), manager.seasons
-                )
+                new_name = anonymizer(manager.name)
+                if new_name in seen_names:
+                    raise RuntimeError(
+                        f"At least two managers [{seen_names[new_name]}, {manager_id}] "
+                        f"have the same name: {new_name}"
+                    )
+
+                seen_names[new_name] = manager_id
+
+                anonymized[manager_id] = Manager(new_name, manager.seasons)
 
             self._data.managers = anonymized
         elif manager_id_mapping is not None:
             mapped = {}
             for manager_id, manager in self._data.managers.items():
-                mapped[manager_id] = Manager(
-                    manager_id_mapping(manager.name), manager.seasons
-                )
+                new_name = manager_id_mapping(manager_id)
+                if new_name in seen_names:
+                    raise RuntimeError(
+                        f"At least two managers [{seen_names[new_name]}, {manager_id}] "
+                        f"have the same name: {new_name}"
+                    )
+
+                seen_names[new_name] = manager_id
+
+                mapped[manager_id] = Manager(new_name, manager.seasons)
 
             self._data.managers = mapped
+        else:
+            for manager_id, manager in self._data.managers.items():
+                name = manager.name
+                if name in seen_names:
+                    raise RuntimeError(
+                        f"At least two managers [{seen_names[name]}, {manager_id}] "
+                        f"have the same name: {name}"
+                    )
+
+                seen_names[name] = manager_id
 
         self._league_summary = None
         self._games = None
@@ -141,3 +170,5 @@ class Transformer:
     def transform(self):
         """Transforms input data into new, internally-stored models that can
         be retrieved by associated properties."""
+
+        assert self._games is None
