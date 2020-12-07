@@ -4,6 +4,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
+from loguru import logger
+
 import league_history_collector.transformer.models as transformer_models
 from league_history_collector.collectors.models import League, Manager
 from league_history_collector.utils import CamelCasedDataclass
@@ -83,6 +85,7 @@ class Transformer:
                 seen_names[new_name] = manager_id
 
                 anonymized[manager_id] = Manager(new_name, manager.seasons)
+                logger.debug(f"Renaming {(manager_id, manager.name)} to {new_name}")
 
             self._data.managers = anonymized
         elif manager_id_mapping is not None:
@@ -98,6 +101,7 @@ class Transformer:
                 seen_names[new_name] = manager_id
 
                 mapped[manager_id] = Manager(new_name, manager.seasons)
+                logger.debug(f"Renaming {(manager_id, manager.name)} to {new_name}")
 
             self._data.managers = mapped
         else:
@@ -111,19 +115,24 @@ class Transformer:
 
                 seen_names[name] = manager_id
 
-        self._league_summary = None
-        self._games = None
-        self._head_to_head = None
-        self._seasons = None
-        self._managers = None
+        args = [{}] * 9
+        self._league_summary = transformer_models.LeagueSummary(*args)
+        self._games = transformer_models.Games({})
+        self._head_to_head = transformer_models.HeadToHead({})
+        self._seasons = transformer_models.Seasons({})
+        self._managers = transformer_models.Managers({})
+
+        self._transformed = False
 
     @property
     def league_summary(self) -> transformer_models.LeagueSummary:
         """Returns a model for the league summary, raising an exception if it has
         not been computed yet."""
 
-        if self._league_summary is None:
-            raise RuntimeError("League summary has not been computed yet")
+        if self._transformed is False:
+            raise RuntimeError(
+                "League summary has not been computed yet, please call transform()."
+            )
 
         return self._league_summary
 
@@ -132,8 +141,10 @@ class Transformer:
         """Returns a model for the games, raising an exception if it has
         not been computed yet."""
 
-        if self._games is None:
-            raise RuntimeError("Games has not been computed yet")
+        if self._transformed is False:
+            raise RuntimeError(
+                "Games has not been computed yet, please call transform()."
+            )
 
         return self._games
 
@@ -142,8 +153,10 @@ class Transformer:
         """Returns a model for the head to head results, raising an exception if it has
         not been computed yet."""
 
-        if self._head_to_head is None:
-            raise RuntimeError("Head to head results have not been computed yet")
+        if self._transformed is False:
+            raise RuntimeError(
+                "Head to head results have not been computed yet, please call transform()."
+            )
 
         return self._head_to_head
 
@@ -152,8 +165,10 @@ class Transformer:
         """Returns a model for the seasons, raising an exception if it has
         not been computed yet."""
 
-        if self._seasons is None:
-            raise RuntimeError("Seasons not been computed yet")
+        if self._transformed is False:
+            raise RuntimeError(
+                "Seasons not been computed yet, please call transform()."
+            )
 
         return self._seasons
 
@@ -162,8 +177,10 @@ class Transformer:
         """Returns a model for the managers, raising an exception if it has
         not been computed yet."""
 
-        if self._managers is None:
-            raise RuntimeError("Managers has not been computed yet")
+        if self._transformed is False:
+            raise RuntimeError(
+                "Managers has not been computed yet, please call transform()."
+            )
 
         return self._managers
 
@@ -171,4 +188,10 @@ class Transformer:
         """Transforms input data into new, internally-stored models that can
         be retrieved by associated properties."""
 
-        assert self._games is None
+        if self._transformed is True:
+            logger.info(
+                "transform has already been called so nothing will be done. Please use this object's properties to get transformed data."
+            )
+            return
+
+        self._transformed = True

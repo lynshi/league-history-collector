@@ -32,6 +32,14 @@ def test_Transformer_validates_parameters(transformer_config: Configuration):
         Transformer(transformer_config, league_data, anonymizer, manager_id_mapping)
 
 
+def test_Transformer_init(transformer_config: Configuration):
+    league_data = MagicMock()
+
+    transformer = Transformer(transformer_config, league_data)
+    assert transformer._transformed is False
+    assert transformer._data == league_data
+
+
 def test_Transformer_finds_duplicate_names(transformer_config: Configuration):
     league_data = MagicMock()
     m1 = MagicMock()
@@ -109,3 +117,23 @@ def test_Transformer_mapping_finds_duplicate_names(transformer_config: Configura
 
     with pytest.raises(RuntimeError):
         Transformer(transformer_config, league_data, manager_id_mapping=mapping)
+
+
+def test_Transformer_unready_properties(transformer_config: Configuration):
+    league_data = MagicMock()
+    transformer = Transformer(transformer_config, league_data)
+
+    with pytest.raises(RuntimeError):
+        assert transformer.league_summary is not None
+
+    with pytest.raises(RuntimeError):
+        assert transformer.head_to_head is not None
+
+    with pytest.raises(RuntimeError):
+        assert transformer.games is not None
+
+    with pytest.raises(RuntimeError):
+        assert transformer.seasons is not None
+
+    with pytest.raises(RuntimeError):
+        assert transformer.managers is not None
