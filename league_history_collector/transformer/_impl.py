@@ -304,7 +304,8 @@ class Transformer:
             managers_result["managers"][manager_name]["seasons"][year] = {
                 "year": year,
                 "madePlayoffs": made_playoffs,
-                "playoffGames": 0,
+                "playoffGames": self._config.playoff_weeks_for_season(year),
+                "playoffRecord": shared_models.Record()
             }
 
 
