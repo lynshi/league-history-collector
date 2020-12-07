@@ -119,10 +119,13 @@ def test_Transformer_mapping_finds_duplicate_names(transformer_config: Configura
         Transformer(transformer_config, league_data, manager_id_mapping=mapping)
 
 
-def test_Transformer_unready_properties(transformer_config: Configuration):
+@pytest.fixture(name="transformer")
+def fixture_transformer():
     league_data = MagicMock()
-    transformer = Transformer(transformer_config, league_data)
+    yield Transformer(Configuration(4), league_data)
 
+
+def test_Transformer_unready_properties(transformer: Transformer):
     with pytest.raises(RuntimeError):
         assert transformer.league_summary is not None
 
@@ -137,3 +140,11 @@ def test_Transformer_unready_properties(transformer_config: Configuration):
 
     with pytest.raises(RuntimeError):
         assert transformer.managers is not None
+
+
+def test_Transformer_get_name_for_team_id(transformer: Transformer):
+    manager_mock = MagicMock()
+    manager_mock.name = "Alice"
+
+    transformer._data.managers = {"1": manager_mock}
+    assert transformer._get_name_for_team_id("1") == "Alice"

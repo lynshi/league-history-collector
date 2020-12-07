@@ -6,8 +6,9 @@ from typing import Callable, Dict, List, Optional
 
 from loguru import logger
 
+import league_history_collector.collectors.models as collector_models
+import league_history_collector.models as shared_models
 import league_history_collector.transformer.models as transformer_models
-from league_history_collector.collectors.models import League, Manager
 from league_history_collector.utils import CamelCasedDataclass
 
 
@@ -59,7 +60,7 @@ class Transformer:
     def __init__(
         self,
         config: Configuration,
-        league_data: League,
+        league_data: collector_models.League,
         anonymizer: Optional[Callable[[str], str]] = None,
         manager_id_mapping: Optional[Callable[[str], str]] = None,
     ):
@@ -84,7 +85,9 @@ class Transformer:
 
                 seen_names[new_name] = manager_id
 
-                anonymized[manager_id] = Manager(new_name, manager.seasons)
+                anonymized[manager_id] = collector_models.Manager(
+                    new_name, manager.seasons
+                )
                 logger.debug(f"Renaming {(manager_id, manager.name)} to {new_name}")
 
             self._data.managers = anonymized
@@ -100,7 +103,7 @@ class Transformer:
 
                 seen_names[new_name] = manager_id
 
-                mapped[manager_id] = Manager(new_name, manager.seasons)
+                mapped[manager_id] = collector_models.Manager(new_name, manager.seasons)
                 logger.debug(f"Renaming {(manager_id, manager.name)} to {new_name}")
 
             self._data.managers = mapped
@@ -194,4 +197,60 @@ class Transformer:
             )
             return
 
+        self._set_games_and_head_to_head()
+
         self._transformed = True
+
+    def _set_games_and_head_to_head(self):
+        head_to_head_result = {"matchups": {}}
+        for _, manager in self._data.managers.items():
+            head_to_head_result["matchups"][manager.name] = {}
+
+        for manager_name in head_to_head_result["matchups"]:
+            for mname in head_to_head_result["matchups"]:
+                head_to_head_result["matchups"][manager_name][mname] = []
+
+        games_result = {"games": {}}
+        for year, season in self._data.seasons.items():
+            games_result["games"][year] = {}
+
+            for week_num, week in season.weeks.items():
+                for game in week.games:
+                    games_result["games"][year][week_num] = shared_models.Game(
+                        team_data=[
+                            shared_models.TeamGameData(
+                                points=team_data.points,
+                                managers=[
+                                    self._get_name_for_team_id(team_id)
+                                    for team_id in team_data.managers
+                                ],
+                                roster=team_data.roster,
+                            )
+                            for team_data in game.team_data
+                        ]
+                    )
+
+                    if len(game.team_data) != 2:
+                        raise ValueError(
+                            f"Amount of team data present is not two: {game.team_data}"
+                        )
+
+                    first_team = game.team_data[0].managers
+                    second_team = game.team_data[1].managers
+
+                    for first_manager in first_team:
+                        for second_manager in second_team:
+                            head_to_head_result["matchups"][first_manager][
+                                second_manager
+                            ].append((year, week_num))
+                            head_to_head_result["matchups"][second_manager][
+                                first_manager
+                            ].append((year, week_num))
+
+        self._games = transformer_models.Games.from_dict(games_result)
+        self._head_to_head = transformer_models.HeadToHead.from_dict(
+            head_to_head_result
+        )
+
+    def _get_name_for_team_id(self, team_id: str) -> str:
+        return self._data.managers[team_id].name
