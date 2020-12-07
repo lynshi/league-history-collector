@@ -1,7 +1,7 @@
 # pylint: disable=missing-module-docstring
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
 
 from league_history_collector.models import Record
 from league_history_collector.utils import CamelCasedDataclass
@@ -13,14 +13,16 @@ class ManagerSeason(
 ):  # pylint: disable=too-many-instance-attributes
     """Contains a manager's season data."""
 
+    year: int
+
     final_standing: int
     made_playoffs: bool
-    playoff_games: Dict[int, int]  # Index into the week of the game
+    playoff_games: List[int]  # Index into the week of the game
     playoff_record: Record
 
-    consolation_games: Dict[int, int]
+    consolation_games: List[int]
 
-    regular_season_games: Dict[int, int]
+    regular_season_games: List[int]
     regular_season_points_against: float
     regular_season_points_scored: float
     regular_season_record: Record

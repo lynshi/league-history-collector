@@ -20,6 +20,9 @@ class Configuration(CamelCasedDataclass):
     # teams inferred to be in the playoffs for each season.
     num_playoff_teams: int
 
+    # List of week numbers corresponding to playoffs.
+    playoff_weeks: List[int]
+
     # Specify the number of playoff teams per season. This will determine
     # teams inferred to be in the playoffs for each season and override
     # `num_playoff_teams` if a value is present for a particular season.
@@ -31,12 +34,16 @@ class Configuration(CamelCasedDataclass):
     # to teams in the playoffs are ignored.
     playoff_teams: Dict[int, List[str]] = field(default_factory=dict)
 
-    def is_in_playoffs(self, manager_id: str, *, rank: int, season: int) -> bool:
+    # Explicitly configure the list of week numbers for the playoffs for a particular season.
+    # Overrides the playoff_weeks attribute when applicable.
+    playoff_weeks_by_season: Dict[int, List[int]] = field(default_factory=dict)
+
+    def is_in_playoffs(self, manager_name: str, *, rank: int, season: int) -> bool:
         """Returns whether the manager made the playoffs for the
         specified season."""
 
         playoff_teams = self.playoff_teams.get(season, [])
-        if manager_id in playoff_teams:
+        if manager_name in playoff_teams:
             return True
 
         if len(playoff_teams) > 0:
@@ -47,6 +54,11 @@ class Configuration(CamelCasedDataclass):
         )
 
         return rank <= num_playoff_teams
+
+    def playoff_weeks_for_season(self, year: int):
+        """Returns the week numbers for playoff weeks for the specified season."""
+
+        return self.playoff_weeks_by_season.get(year, self.playoff_weeks)
 
 
 class Transformer:
@@ -197,14 +209,19 @@ class Transformer:
             )
             return
 
-        self._set_games_and_head_to_head()
+        self._set_base_models()
 
         self._transformed = True
 
-    def _set_games_and_head_to_head(self):
+    def _set_base_models(self):  # pylint: disable=too-many-locals
+        managers_result = {"managers": {}}
         head_to_head_result = {"matchups": {}}
         for _, manager in self._data.managers.items():
             head_to_head_result["matchups"][manager.name] = {}
+
+            managers_result["managers"][manager.name] = {"seasons": {}}
+            for year in manager.seasons:
+                managers_result["managers"][manager.name]["seasons"][year] = {}
 
         for manager_name in head_to_head_result["matchups"]:
             for mname in head_to_head_result["matchups"]:
@@ -212,45 +229,96 @@ class Transformer:
 
         games_result = {"games": {}}
         for year, season in self._data.seasons.items():
-            games_result["games"][year] = {}
+            self._populate_h2h_and_games_for_season(
+                year,
+                season,
+                head_to_head_result=head_to_head_result,
+                games_result=games_result,
+            )
 
-            for week_num, week in season.weeks.items():
-                for game in week.games:
-                    games_result["games"][year][week_num] = shared_models.Game(
-                        team_data=[
-                            shared_models.TeamGameData(
-                                points=team_data.points,
-                                managers=[
-                                    self._get_name_for_team_id(team_id)
-                                    for team_id in team_data.managers
-                                ],
-                                roster=team_data.roster,
-                            )
-                            for team_data in game.team_data
-                        ]
-                    )
-
-                    if len(game.team_data) != 2:
-                        raise ValueError(
-                            f"Amount of team data present is not two: {game.team_data}"
-                        )
-
-                    first_team = game.team_data[0].managers
-                    second_team = game.team_data[1].managers
-
-                    for first_manager in first_team:
-                        for second_manager in second_team:
-                            head_to_head_result["matchups"][first_manager][
-                                second_manager
-                            ].append((year, week_num))
-                            head_to_head_result["matchups"][second_manager][
-                                first_manager
-                            ].append((year, week_num))
+            self._populate_manager_results(year, season.standings, managers_result)
 
         self._games = transformer_models.Games.from_dict(games_result)
         self._head_to_head = transformer_models.HeadToHead.from_dict(
             head_to_head_result
         )
+        self._managers = transformer_models.Managers.from_dict(managers_result)
 
-    def _get_name_for_team_id(self, team_id: str) -> str:
+    def _get_name_for_manager_id(self, team_id: str) -> str:
         return self._data.managers[team_id].name
+
+    def _populate_h2h_and_games_for_season(
+        self,
+        year: int,
+        season: collector_models.Season,
+        *,
+        head_to_head_result: Dict,
+        games_result: Dict,
+    ):
+        games_result["games"][year] = {}
+        for week_num, week in season.weeks.items():
+            for game in week.games:
+                games_result["games"][year][week_num] = shared_models.Game(
+                    team_data=[
+                        shared_models.TeamGameData(
+                            points=team_data.points,
+                            managers=[
+                                self._get_name_for_manager_id(team_id)
+                                for team_id in team_data.managers
+                            ],
+                            roster=team_data.roster,
+                        )
+                        for team_data in game.team_data
+                    ]
+                )
+
+                if len(game.team_data) != 2:
+                    raise ValueError(
+                        f"Amount of team data present is not two: {game.team_data}"
+                    )
+
+                first_team = game.team_data[0].managers
+                second_team = game.team_data[1].managers
+
+                for first_manager in first_team:
+                    for second_manager in second_team:
+                        head_to_head_result["matchups"][first_manager][
+                            second_manager
+                        ].append((year, week_num))
+                        head_to_head_result["matchups"][second_manager][
+                            first_manager
+                        ].append((year, week_num))
+
+    def _populate_manager_results(
+        self,
+        year: int,
+        standings: Dict[str, collector_models.ManagerStanding],
+        managers_result: Dict,
+    ):
+        for mid, standing in standings.items():
+            manager_name = self._get_name_for_manager_id(mid)
+            made_playoffs = self._config.is_in_playoffs(
+                manager_name, rank=standing.regular_season_standing.rank, season=year
+            )
+
+            managers_result["managers"][manager_name]["seasons"][year] = {
+                "year": year,
+                "madePlayoffs": made_playoffs,
+                "playoffGames": 0,
+            }
+
+
+# year: int  # useful for pandas
+
+#     final_standing: int
+#     made_playoffs: bool
+#     playoff_games: Dict[int, int]  # Index into the week of the game
+#     playoff_record: Record
+
+#     consolation_games: Dict[int, int]
+
+#     regular_season_games: Dict[int, int]
+#     regular_season_points_against: float
+#     regular_season_points_scored: float
+#     regular_season_record: Record
+#     regular_season_standing: int

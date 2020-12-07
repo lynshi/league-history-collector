@@ -7,8 +7,22 @@ import pytest
 from league_history_collector.transformer import Configuration, Transformer
 
 
+def test_Configuration_init():
+    config = Configuration(2, [15, 16])
+    assert config.num_playoff_teams == 2
+    assert config.playoff_weeks == {15, 16}
+    assert config.playoff_weeks_by_season == {}
+    assert config.num_playoff_teams_by_season == {}
+    assert config.playoff_teams == {}
+
+
 def test_Configuration_is_in_playoffs():
-    config = Configuration(4, {2017: 2}, {2018: ["foo"]})
+    config = Configuration(
+        4,
+        [15, 16],
+        num_playoff_teams_by_season={2017: 2},
+        playoff_teams={2018: ["foo"]},
+    )
 
     assert config.is_in_playoffs("bar", season=2016, rank=3) is True
     assert config.is_in_playoffs("foo", season=2016, rank=5) is False
@@ -18,9 +32,16 @@ def test_Configuration_is_in_playoffs():
     assert config.is_in_playoffs("foo", season=2018, rank=10) is True
 
 
+def test_Configuration_playoff_weeks_for_season():
+    config = Configuration(4, [15, 16], playoff_weeks_by_season={2019: [14, 15, 16]})
+
+    assert config.playoff_weeks_for_season(2018) == [15, 16]
+    assert config.playoff_weeks_for_season(2019) == [14, 15, 16]
+
+
 @pytest.fixture(name="transformer_config")
 def fixture_transformer_config():
-    yield Configuration(4)
+    yield Configuration(4, [15, 16])
 
 
 def test_Transformer_validates_parameters(transformer_config: Configuration):
@@ -122,7 +143,7 @@ def test_Transformer_mapping_finds_duplicate_names(transformer_config: Configura
 @pytest.fixture(name="transformer")
 def fixture_transformer():
     league_data = MagicMock()
-    yield Transformer(Configuration(4), league_data)
+    yield Transformer(Configuration(4, [15, 16]), league_data)
 
 
 def test_Transformer_unready_properties(transformer: Transformer):
@@ -142,9 +163,9 @@ def test_Transformer_unready_properties(transformer: Transformer):
         assert transformer.managers is not None
 
 
-def test_Transformer_get_name_for_team_id(transformer: Transformer):
+def test_Transformer_get_name_for_manager_id(transformer: Transformer):
     manager_mock = MagicMock()
     manager_mock.name = "Alice"
 
     transformer._data.managers = {"1": manager_mock}
-    assert transformer._get_name_for_team_id("1") == "Alice"
+    assert transformer._get_name_for_manager_id("1") == "Alice"
