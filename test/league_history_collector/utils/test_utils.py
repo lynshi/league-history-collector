@@ -1,7 +1,7 @@
 # pylint: disable=missing-class-docstring,missing-function-docstring,redefined-outer-name,missing-module-docstring,invalid-name
 
-from dataclasses_json import LetterCase
-from dataclasses_json import config as dataclasses_json_config
+from dataclasses_json.api import LetterCase
+from dataclasses_json.cfg import config as dataclasses_json_config
 from stringcase import camelcase
 
 from league_history_collector.utils import CamelCasedDataclass

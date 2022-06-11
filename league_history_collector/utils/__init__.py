@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import ClassVar, Dict
 
-from dataclasses_json import DataClassJsonMixin, LetterCase
-from dataclasses_json import config as dataclasses_json_config
+from dataclasses_json.api import DataClassJsonMixin, LetterCase
+from dataclasses_json.cfg import config as dataclasses_json_config
 from stringcase import camelcase
 
 

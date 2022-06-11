@@ -222,23 +222,28 @@ def test_login(nfl_collector: NFLCollector):
         fake_button1_mock,
     ]
 
-    nfl_collector._driver.current_url = (
+    nfl_collector._driver.current_url = (  # type: ignore
         f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}"
     )
 
     with patch("time.sleep") as sleep_mock:
         nfl_collector._login()
 
-    expected_login_url = (
-        "https://fantasy.nfl.com/account/sign-in?s=fantasy&"
-        f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
-    )
+    expected_login_url = "https://fantasy.nfl.com/account/sign-in"
 
-    nfl_collector._change_page.assert_any_call(
-        nfl_collector._driver.get,
-        expected_login_url,
+    nfl_collector._change_page.assert_has_calls(
+        [
+            call(
+                nfl_collector._driver.get,
+                expected_login_url,
+            ),
+            call(
+                nfl_collector._driver.get,
+                f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}",
+            ),
+        ],
+        any_order=True,
     )
-
     nfl_collector._driver.find_element_by_id.assert_any_call("gigya-login-form")
     login_form_mock.find_element_by_id.assert_has_calls(
         [
@@ -311,7 +316,7 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
         fake_button1_mock,
     ]
 
-    nfl_collector._driver.current_url = (
+    nfl_collector._driver.current_url = (  # type: ignore
         f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}"
     )
 
@@ -319,10 +324,7 @@ def test_login_no_login_button(nfl_collector: NFLCollector):
         nfl_collector._login()
         assert f"{exception_raised.value}" == "Could not find login button"
 
-    expected_login_url = (
-        "https://fantasy.nfl.com/account/sign-in?s=fantasy&"
-        f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
-    )
+    expected_login_url = "https://fantasy.nfl.com/account/sign-in"
 
     nfl_collector._change_page.assert_any_call(
         nfl_collector._driver.get,
@@ -408,7 +410,7 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
         fake_button1_mock,
     ]
 
-    nfl_collector._driver.current_url = (
+    nfl_collector._driver.current_url = (  # type: ignore
         f"not https://fantasy.nfl.com/league/{nfl_collector._config.league_id}"
     )
     expected_url = f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}"
@@ -422,14 +424,20 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
                 f"{nfl_collector._driver.current_url} instead"
             )
 
-    expected_login_url = (
-        "https://fantasy.nfl.com/account/sign-in?s=fantasy&"
-        f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{nfl_collector._config.league_id}"
-    )
+    expected_login_url = "https://fantasy.nfl.com/account/sign-in"
 
-    nfl_collector._change_page.assert_any_call(
-        nfl_collector._driver.get,
-        expected_login_url,
+    nfl_collector._change_page.assert_has_calls(
+        [
+            call(
+                nfl_collector._driver.get,
+                expected_login_url,
+            ),
+            call(
+                nfl_collector._driver.get,
+                f"https://fantasy.nfl.com/league/{nfl_collector._config.league_id}",
+            ),
+        ],
+        any_order=True,
     )
 
     nfl_collector._driver.find_element_by_id.assert_any_call("gigya-login-form")
