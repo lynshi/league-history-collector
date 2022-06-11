@@ -112,11 +112,8 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         return result
 
     def _login(self):
-        login_url = (
-            "https://fantasy.nfl.com/account/sign-in?s=fantasy&"
-            f"returnTo=http%3A%2F%2Ffantasy.nfl.com%2Fleague%2F{self._config.league_id}"
-        )
-        logger.info(f"Logging in to league at {login_url}")
+        login_url = "https://fantasy.nfl.com/account/sign-in"
+        logger.info(f"Logging in to NFL.com at {login_url}")
         self._change_page(self._driver.get, login_url)
 
         login_form = self._driver.find_element_by_id("gigya-login-form")
@@ -156,6 +153,7 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             time.sleep(sleep_seconds)  # wait for redirect
 
         league_url = f"https://fantasy.nfl.com/league/{self._config.league_id}"
+        self._change_page(self._driver.get, league_url)
         if league_url != self._driver.current_url:
             msg = f"Expected to be on page {league_url}, but on {self._driver.current_url} instead"
             logger.error(msg)
