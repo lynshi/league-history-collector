@@ -1,5 +1,6 @@
 """Collector for Sleeper leagues."""
 
+from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
@@ -14,8 +15,10 @@ from league_history_collector.collectors.models import (
     FinalStanding,
     League,
     Manager,
+    RegularSeasonStanding,
     Season,
 )
+from league_history_collector.models.record import Record
 from league_history_collector.utils import CamelCasedDataclass
 
 
@@ -130,8 +133,12 @@ class SleeperCollector(ICollector):
 
     def _get_regular_season_standings(
         self, team_to_manager: Dict[str, List[str]]
-    ) -> Dict[str, FinalStanding]:
+    ) -> Dict[str, RegularSeasonStanding]:
         rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
+        logger.info(
+            f"Getting regular season standings for {self._config.year} from {rosters_uri}"
+        )
+
         response = requests.get(rosters_uri)
         response.raise_for_status()
         rosters_data = response.json()
@@ -139,24 +146,57 @@ class SleeperCollector(ICollector):
         # Sleeper doesn't have a nice API for getting the final standings, so we'll compute the
         # standings using an ordering that makes sense.
         teams = []
+        TeamResults = namedtuple(
+            "TeamResults",
+            [
+                "wins",
+                "ties",
+                "losses",
+                "points_for",
+                "points_against",
+                "roster_id",
+            ],
+        )
         for roster in rosters_data:
-            teams.append(
-                (
-                    roster["settings"]["wins"],
-                    roster["settings"]["ties"],
-                    roster["settings"]["fpts"],
-                    roster["settings"]["fpts_decimal"],
-                    roster["settings"]["fpts_against"],
-                    roster["settings"]["fpts_against_decimal"],
-                    team_to_manager["roster_id"],
-                )
+            team_result = TeamResults(
+                wins=roster["settings"]["wins"],
+                ties=roster["settings"]["ties"],
+                losses=roster["settings"]["losses"],
+                points_for=float(
+                    f'{roster["settings"]["fpts"]}.{roster["settings"]["fpts_decimal"]}'
+                ),
+                points_against=float(
+                    f'{roster["settings"]["fpts_against"]}."'
+                    f'{roster["settings"]["fpts_against_decimal"]}'
+                ),
+                roster_id=roster["roster_id"],
             )
-        teams.sort(reverse=True)
+            teams.append(team_result)
+        teams.sort(
+            key=lambda t: (t.wins, t.ties, t.points_for, t.points_against), reverse=True
+        )
 
-        final_standings = {
-            team[-1]: FinalStanding(i + 1) for i, team in enumerate(teams)
+        regular_season_standings = {
+            team[team_to_manager[team.roster_id]]: RegularSeasonStanding(
+                rank=i + 1,
+                points_scored=team.points_for,
+                points_against=team.points_against,
+                record=Record(
+                    wins=team.wins,
+                    ties=team.ties,
+                    losses=team.losses,
+                ),
+            )
+            for i, team in enumerate(teams)
         }
-        return final_standings
+
+        for manager_id, standing in regular_season_standings.items():
+            logger.debug(
+                f"Regular season standing for manager {manager_id} in {self._config.year}: "
+                f"{standing.to_json()}"
+            )
+
+        return regular_season_standings
 
     @staticmethod
     def _get_players() -> Dict[str, Any]:

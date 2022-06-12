@@ -2,9 +2,12 @@ appdirs==1.4.4
 astroid==2.4.2
 attrs==20.3.0
 black==20.8b1
+certifi==2022.5.18.1
+charset-normalizer==2.0.12
 click==7.1.2
 coverage==5.3
 dataclasses-json==0.5.2
+idna==3.3
 iniconfig==1.1.1
 isort==5.6.4
 lazy-object-proxy==1.4.3
@@ -21,6 +24,7 @@ pylint==2.6.0
 pyparsing==2.4.7
 pytest==6.1.2
 regex==2020.11.13
+requests==2.28.0
 selenium==3.141.0
 six==1.15.0
 stringcase==1.2.0
