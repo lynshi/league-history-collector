@@ -6,11 +6,17 @@ import json
 import os
 from typing import Any, ClassVar, Dict, List, Tuple
 
+from loguru import logger
 import requests
 
-from league_history_collector.utils import CamelCasedDataclass
 from league_history_collector.collectors.base import ICollector
-from league_history_collector.collectors.models import League, Manager, Season
+from league_history_collector.collectors.models import (
+    FinalStanding,
+    League,
+    Manager,
+    Season,
+)
+from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
@@ -36,7 +42,9 @@ class SleeperCollector(ICollector):
         self._players = self._update_players()
 
     def get_seasons(self) -> List[int]:
-        raise NotImplementedError("Not implemented for Sleeper, as league ids uniquely identify a season")
+        raise NotImplementedError(
+            "Not implemented for Sleeper, as league ids uniquely identify a season"
+        )
 
     def save_all_data(self) -> League:
         league = League(self._config.league_id, managers={}, seasons={})
@@ -51,7 +59,7 @@ class SleeperCollector(ICollector):
         league.seasons[year] = Season(standings={}, weeks={})
 
         # Collect standings information.
-        final_standings = self._get_final_standings(year, team_to_manager)
+        final_standings = self._get_final_standings(team_to_manager)
         regular_season_standings = self._get_regular_season_standings(
             year, team_to_manager
         )
@@ -96,15 +104,19 @@ class SleeperCollector(ICollector):
         return players
 
     def _get_managers(self) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
-        managers_uri = SleeperCollector._managers_endpoint.format(self._config.league_id)
+        managers_uri = SleeperCollector._managers_endpoint.format(
+            self._config.league_id
+        )
         response = requests.get(managers_uri)
         response.raise_for_status()
         managers_data = response.json()
 
         managers_result = {}
         for manager in managers_data:
-            managers_result[manager["user_id"]] = Manager(manager["username"], seasons=[self._config.year])
-        
+            managers_result[manager["user_id"]] = Manager(
+                manager["username"], seasons=[self._config.year]
+            )
+
         rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
         response = requests.get(rosters_uri)
         response.raise_for_status()
@@ -115,6 +127,36 @@ class SleeperCollector(ICollector):
             team_to_manager[roster["roster_id"]] = roster["owner_id"]
 
         return team_to_manager, managers_result
+
+    def _get_final_standings(  # pylint: disable=too-many-locals
+        self, team_to_manager: Dict[str, List[str]]
+    ) -> Dict[str, FinalStanding]:
+        rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
+        response = requests.get(rosters_uri)
+        response.raise_for_status()
+        rosters_data = response.json()
+
+        # Sleeper doesn't have a nice API for getting the final standings, so we'll compute the
+        # standings using an ordering that makes sense.
+        teams = []
+        for roster in rosters_data:
+            teams.append(
+                (
+                    roster["settings"]["wins"],
+                    roster["settings"]["ties"],
+                    roster["settings"]["fpts"],
+                    roster["settings"]["fpts_decimal"],
+                    roster["settings"]["fpts_against"],
+                    roster["settings"]["fpts_against_decimal"],
+                    team_to_manager["roster_id"],
+                )
+            )
+        teams.sort(reverse=True)
+
+        final_standings = {
+            team[-1]: FinalStanding(i + 1) for i, team in enumerate(teams)
+        }
+        return final_standings
 
     @staticmethod
     def _get_players() -> Dict[str, Any]:
