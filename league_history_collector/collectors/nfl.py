@@ -72,6 +72,8 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
                 uniformly randomly selected from within this range (inclusive).
         """
 
+        super().__init__()
+
         self._config = config
 
         self._driver = driver

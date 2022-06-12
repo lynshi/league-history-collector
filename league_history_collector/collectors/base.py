@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import json
-from typing import Optional
+from typing import List, Optional
 
 from league_history_collector.collectors.models import League
 from league_history_collector.utils import CamelCasedDataclass
@@ -58,3 +58,21 @@ class ICollector(ABC):  # pylint: disable=too-few-public-methods
     @abstractmethod
     def save_all_data(self) -> League:
         """Save all retrievable data as desired by the implementation."""
+
+    @abstractmethod
+    def set_season_data(self, year: int, league: League):
+        """Sets data for the specified season in the provided league object.
+
+        :param year: Year of the season.
+        :type year: int
+        :param league: League data object, to be modified by this method.
+        :type league: League
+        """
+
+    @abstractmethod
+    def get_seasons(self) -> List[int]:
+        """Gets a list of seasons in the league.
+
+        :return: A list of seasons, identified by year.
+        :rtype: List[int]
+        """
