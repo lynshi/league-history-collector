@@ -36,6 +36,9 @@ class SleeperCollector(ICollector):
 
     _all_players_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/players/nfl"
     _managers_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/users"
+    _playoffs_endpoint: ClassVar[
+        str
+    ] = "https://api.sleeper.app/v1/league/{}/winners_bracket"
     _rosters_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/rosters"
 
     def __init__(self, config: SleeperConfiguration):
@@ -63,9 +66,7 @@ class SleeperCollector(ICollector):
 
         # Collect standings information.
         final_standings = self._get_final_standings(team_to_manager)
-        regular_season_standings = self._get_regular_season_standings(
-            year, team_to_manager
-        )
+        regular_season_standings = self._get_regular_season_standings(team_to_manager)
 
         # Populate league with standings information.
         for manager_id, manager in managers.items():
@@ -106,10 +107,101 @@ class SleeperCollector(ICollector):
 
         return players
 
+    def _get_final_standings(
+        self, team_to_manager: Dict[str, List[str]]
+    ) -> Dict[str, FinalStanding]:
+        # We don't actually care about the final standings, only the winner and runner-up, as nobody
+        # takes the other matchups seriously. So since Sleeper doesn't make it easy to get the final
+        # standings, we'll only set the winner and runner-up because that's the easier to do.
+        playoffs_uri = SleeperCollector._playoffs_endpoint.format(
+            self._config.league_id
+        )
+        logger.info(
+            f"Getting final standings for {self._config.year} from {playoffs_uri}"
+        )
+
+        response = requests.get(playoffs_uri)
+        response.raise_for_status()
+        playoffs_data: List[Dict[Any, Any]] = response.json()
+
+        # The runner-up is the team that loses to the champion.
+        # The champion is the winner of the championship matchup.
+        # The championship matchup is the matchup in the last round made up only of winners of
+        # "valid" matchups.
+        # "Valid" matchups are those in which participants are only winners of previous matchups.
+        valid_matchups = set()
+
+        # Sort the matchups in order of rounds, just in case they aren't ordered coming in.
+        playoffs_data.sort(key=lambda m: (m["r"]))
+        championship_round = None
+        for matchup in playoffs_data:
+            round_id = matchup["r"]
+            championship_round = max(round_id, championship_round)
+            if round_id == 1:
+                valid_matchups.add((round_id, matchup["m"]))
+                continue
+
+            t1_from = matchup.get("t1_from", None)
+            if t1_from:
+                w = t1_from.get("w", None)
+                if w is None or w not in valid_matchups:
+                    continue
+
+            t2_from = matchup.get("t2_from", None)
+            if t2_from:
+                w = t2_from.get("w", None)
+                if w is None or w not in valid_matchups:
+                    continue
+
+            valid_matchups.add((round_id, matchup["m"]))
+
+        logger.debug(
+            f"The championship round in {self._config.year} is round {championship_round}"
+        )
+
+        # Separately set the championship matchup to ensure it is only set once.
+        championship_matchup = None
+        for r_id, m_id in valid_matchups:
+            if r_id != championship_round:
+                continue
+
+            if championship_matchup is not None:
+                raise ValueError(
+                    f"The championship matchup was already to {championship_matchup}"
+                )
+
+            championship_matchup = m_id
+
+        logger.debug(
+            f"The championship matchup in {self._config.year} is round {championship_matchup}"
+        )
+
+        final_standings = {}
+        # Start at the end because the championship round should be towards the end of the list.
+        for i in range(len(playoffs_data) - 1, -1, -1):
+            matchup = playoffs_data[i]
+            if (
+                matchup["r"] != championship_round
+                or matchup["m"] != championship_matchup
+            ):
+                continue
+
+            final_standings[team_to_manager[matchup["w"]]] = FinalStanding(1)
+            final_standings[team_to_manager[matchup["l"]]] = FinalStanding(2)
+            break
+
+        assert (
+            len(final_standings) == 2
+        ), f"Expected two managers in final standings, got {final_standings}"
+        logger.info(f"Final standings in {self._config.year}: {final_standings}")
+        return final_standings
+
     def _get_managers(self) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         managers_uri = SleeperCollector._managers_endpoint.format(
             self._config.league_id
         )
+        logger.info(f"Getting managers for {self._config.year} from {managers_uri}")
+
         response = requests.get(managers_uri)
         response.raise_for_status()
         managers_data = response.json()
@@ -128,7 +220,12 @@ class SleeperCollector(ICollector):
         team_to_manager = {}
         for roster in rosters_data:
             team_to_manager[roster["roster_id"]] = roster["owner_id"]
+            logger.debug(
+                f"In {self._config.year}, found manager {managers_result['owner_id'].name} for "
+                f"team {roster['roster_id']}"
+            )
 
+        logger.debug(f"Team to manager mapping: {team_to_manager}")
         return team_to_manager, managers_result
 
     def _get_regular_season_standings(
