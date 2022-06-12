@@ -50,7 +50,7 @@ if __name__ == "__main__":
         logger.info(f"Managers in 2019: {managers}")
 
         if FLAGS["GET_SEASONS"]:
-            seasons = collector._get_seasons()
+            seasons = collector.get_seasons()
             logger.info(
                 f"The following seasons are present in league history: {seasons}"
             )
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
         if FLAGS["SET_SEASON_DATA"]:
             league = League(id=config.league_id, managers={}, seasons={})
-            collector._set_season_data(2019, league)
+            collector.set_season_data(2019, league)
 
             logger.info(json.dumps(league.to_dict(), sort_keys=True, indent=4))
 

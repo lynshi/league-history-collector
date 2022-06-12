@@ -81,16 +81,19 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         # Subtract so first action can occur immediately
         self._last_page_load_time = time.time() - self._time_between_pages_range[1]
 
+        self._logged_in = False
+
     def save_all_data(self) -> League:
         """Save all league data."""
 
         league = League(id=self._config.league_id, managers={}, seasons={})
 
-        self._login()
+        if not self._logged_in:
+            self._login()
 
-        seasons = self._get_seasons()
+        seasons = self.get_seasons()
         for year in seasons:
-            self._set_season_data(year, league)
+            self.set_season_data(year, league)
 
         return league
 
@@ -160,8 +163,17 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
             raise RuntimeError(msg)
 
         logger.success(f"Successfully logged in to {league_url}!")
+        self._logged_in = True
 
-    def _get_seasons(self) -> List[int]:
+    def get_seasons(self) -> List[int]:
+        """Gets a list of seasons in the league.
+
+        :return: A list of seasons, identified by year.
+        :rtype: List[int]
+        """
+        if not self._logged_in:
+            self._login()
+
         league_history_url = (
             f"https://fantasy.nfl.com/league/{self._config.league_id}/history"
         )
@@ -179,7 +191,17 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
 
         return seasons
 
-    def _set_season_data(self, year: int, league: League):
+    def set_season_data(self, year: int, league: League):
+        """Sets data for the specified season in the provided league object.
+
+        :param year: Year of the season.
+        :type year: int
+        :param league: League data object, to be modified by this method.
+        :type league: League
+        """
+        if not self._logged_in:
+            self._login()
+
         # Get mapping of team ID to manager ID, and list of managers for the year.
         team_to_manager, managers = self._get_managers(year)
 

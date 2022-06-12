@@ -55,6 +55,7 @@ def test_init():
     assert collector._driver == driver_mock
     assert collector._time_between_pages_range == time_between_pages_range
     assert collector._wait_seconds_after_page_change == wait_seconds_after_page_change
+    assert collector._logged_in is False
 
     time_mock.assert_called_once()
     assert (
@@ -74,26 +75,27 @@ def fixture_nfl_collector():
 
     driver_mock = MagicMock()
 
-    yield NFLCollector(config, driver_mock)
+    collector = NFLCollector(config, driver_mock)
+    yield collector
 
 
 def test_save_all_data(nfl_collector: NFLCollector):
     nfl_collector._login = MagicMock()
-    nfl_collector._get_seasons = MagicMock(return_value=[2019, 2018])
-    nfl_collector._set_season_data = MagicMock()
+    nfl_collector.get_seasons = MagicMock(return_value=[2019, 2018])
+    nfl_collector.set_season_data = MagicMock()
 
     assert nfl_collector.save_all_data() == League(
         nfl_collector._config.league_id, {}, {}
     )
 
     nfl_collector._login.assert_called_once()
-    nfl_collector._get_seasons.assert_called_once()
+    nfl_collector.get_seasons.assert_called_once()
 
-    assert nfl_collector._set_season_data.call_args_list[0][0][0] == 2019
-    assert isinstance(nfl_collector._set_season_data.call_args_list[0][0][1], League)
+    assert nfl_collector.set_season_data.call_args_list[0][0][0] == 2019
+    assert isinstance(nfl_collector.set_season_data.call_args_list[0][0][1], League)
 
-    assert nfl_collector._set_season_data.call_args_list[1][0][0] == 2018
-    assert isinstance(nfl_collector._set_season_data.call_args_list[1][0][1], League)
+    assert nfl_collector.set_season_data.call_args_list[1][0][0] == 2018
+    assert isinstance(nfl_collector.set_season_data.call_args_list[1][0][1], League)
 
 
 def test_change_page_no_sleep(nfl_collector: NFLCollector):
@@ -469,6 +471,7 @@ def test_login_unmatched_url(nfl_collector: NFLCollector):
 
 
 def test_get_seasons(nfl_collector: NFLCollector):
+    nfl_collector._login = MagicMock()
     nav_mock = MagicMock()
     dropdown_mock = MagicMock()
     season0_mock = MagicMock()
@@ -482,7 +485,9 @@ def test_get_seasons(nfl_collector: NFLCollector):
     season0_mock.get_attribute.return_value = "2019 Season"
     season1_mock.get_attribute.return_value = "2018 Season"
 
-    assert nfl_collector._get_seasons() == [2019, 2018]
+    assert nfl_collector.get_seasons() == [2019, 2018]
+
+    nfl_collector._login.assert_called_once()
 
     nfl_collector._change_page.assert_called_once_with(
         nfl_collector._driver.get,
