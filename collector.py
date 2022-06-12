@@ -1,6 +1,7 @@
 """Collects league history."""
 
 import argparse
+import json
 import sys
 
 from loguru import logger
@@ -30,7 +31,7 @@ def run_collector(collector_config: NFLConfiguration):
             collector.set_season_data(year, league)
 
             with open(f"{year}.json", "w") as outfile:
-                outfile.write(league.to_json())
+                json.dump(league.to_dict(), outfile, sort_keys=True, indent=2)
 
             overall_league_data.seasons[year] = league.seasons[year]
             for manager, manager_data in league.managers.items():
@@ -40,7 +41,7 @@ def run_collector(collector_config: NFLConfiguration):
                     overall_league_data.managers[manager].seasons.append(year)
 
         with open("league.json", "w") as outfile:
-            outfile.write(overall_league_data.to_json())
+            json.dump(overall_league_data.to_dict(), outfile, sort_keys=True, indent=2)
 
 
 if __name__ == "__main__":
