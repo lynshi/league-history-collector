@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
 import os
-from typing import Any, ClassVar, Dict, List, Tuple
+from typing import Any, ClassVar, Dict, List, Set, Tuple
 
 from loguru import logger
 import requests
@@ -15,6 +15,7 @@ from league_history_collector.collectors.models import (
     FinalStanding,
     League,
     Manager,
+    ManagerStanding,
     RegularSeasonStanding,
     Season,
 )
@@ -36,6 +37,7 @@ class SleeperCollector(ICollector):
 
     _all_players_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/players/nfl"
     _managers_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/users"
+    _matchups_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/matchups/{}"
     _playoffs_endpoint: ClassVar[
         str
     ] = "https://api.sleeper.app/v1/league/{}/winners_bracket"
@@ -83,7 +85,7 @@ class SleeperCollector(ICollector):
             league.seasons[year].standings[manager_id] = manager_standing
 
         # Get and populate games information.
-        weeks_in_league = self._get_weeks(year)
+        weeks_in_league = self._get_weeks()
         for week in weeks_in_league:
             week_data = self._get_games_for_week(year, week, team_to_manager)
             league.seasons[year].weeks[week] = week_data
@@ -193,7 +195,7 @@ class SleeperCollector(ICollector):
         assert (
             len(final_standings) == 2
         ), f"Expected two managers in final standings, got {final_standings}"
-        logger.info(f"Final standings in {self._config.year}: {final_standings}")
+        logger.debug(f"Final standings in {self._config.year}: {final_standings}")
         return final_standings
 
     def _get_managers(self) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
@@ -294,6 +296,26 @@ class SleeperCollector(ICollector):
             )
 
         return regular_season_standings
+
+    def _get_weeks(self) -> Set[int]:
+        weeks = set()
+
+        # The number of weeks may vary as the length of the NFL season has changed.
+        # We'll exclude weeks without games. Since there might be a week with no games if we decide
+        # to introduce bye weeks (...?), let's just count until a large number.
+        for week_id in range(1, 32):
+            week_uri = SleeperCollector._matchups_endpoint.format(self._config.league_id, week_id)
+            logger.info(f"Checking if there are any games in week {week_id} at {week_uri}")
+
+            response = requests.get(week_uri)
+            response.raise_for_status()
+            week_data = response.json()
+
+            if week_data:
+                weeks.add(week_id)
+
+        logger.debug(f"Weeks with games: {weeks}")
+        return weeks
 
     @staticmethod
     def _get_players() -> Dict[str, Any]:
