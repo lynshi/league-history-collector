@@ -128,7 +128,7 @@ class SleeperCollector(ICollector):
 
         return team_to_manager, managers_result
 
-    def _get_final_standings(  # pylint: disable=too-many-locals
+    def _get_regular_season_standings(
         self, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, FinalStanding]:
         rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
