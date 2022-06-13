@@ -7,6 +7,7 @@ import json
 import os
 from typing import Any, ClassVar, Dict, List, Set, Tuple
 
+from dataclasses_json.api import DataClassJsonMixin
 from loguru import logger
 import requests
 
@@ -21,12 +22,11 @@ from league_history_collector.collectors.models import (
     Week,
 )
 from league_history_collector.models import Game, Record, Roster, TeamGameData
-from league_history_collector.utils import CamelCasedDataclass
 
 
 @dataclass
-class SleeperConfiguration(CamelCasedDataclass):
-    """Extends the Configuration class with fields specific for NFL Fantasy."""
+class SleeperConfiguration(DataClassJsonMixin):
+    """Configuration for getting data from Sleeper."""
 
     league_id: str
     players_file: str
@@ -82,7 +82,7 @@ class SleeperCollector(ICollector):
                 league.managers[manager_id].seasons.append(year)
 
             manager_standing = ManagerStanding(
-                final_standing=final_standings[manager_id],
+                final_standing=final_standings.get(manager_id, FinalStanding(None)),
                 regular_season_standing=regular_season_standings[manager_id],
             )
             league.seasons[year].standings[manager_id] = manager_standing
@@ -135,15 +135,21 @@ class SleeperCollector(ICollector):
         # "valid" matchups.
         # "Valid" matchups are those in which participants are only winners of previous matchups.
         valid_matchups = set()
+        valid_matchups_including_round = set()
 
         # Sort the matchups in order of rounds, just in case they aren't ordered coming in.
         playoffs_data.sort(key=lambda m: (m["r"]))
         championship_round = None
         for matchup in playoffs_data:
             round_id = matchup["r"]
-            championship_round = max(round_id, championship_round)
+            championship_round = (
+                max(round_id, championship_round)
+                if championship_round is not None
+                else round_id
+            )
             if round_id == 1:
-                valid_matchups.add((round_id, matchup["m"]))
+                valid_matchups.add(matchup["m"])
+                valid_matchups_including_round.add((round_id, matchup["m"]))
                 continue
 
             t1_from = matchup.get("t1_from", None)
@@ -158,7 +164,8 @@ class SleeperCollector(ICollector):
                 if w is None or w not in valid_matchups:
                     continue
 
-            valid_matchups.add((round_id, matchup["m"]))
+            valid_matchups.add(matchup["m"])
+            valid_matchups_including_round.add((round_id, matchup["m"]))
 
         logger.debug(
             f"The championship round in {self._config.year} is round {championship_round}"
@@ -166,7 +173,7 @@ class SleeperCollector(ICollector):
 
         # Separately set the championship matchup to ensure it is only set once.
         championship_matchup = None
-        for r_id, m_id in valid_matchups:
+        for r_id, m_id in valid_matchups_including_round:
             if r_id != championship_round:
                 continue
 
@@ -219,7 +226,7 @@ class SleeperCollector(ICollector):
         managers_result = {}
         for manager in managers_data:
             managers_result[manager["user_id"]] = Manager(
-                manager["username"], seasons=[self._config.year]
+                manager["display_name"], seasons=[self._config.year]
             )
 
         rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
@@ -234,7 +241,7 @@ class SleeperCollector(ICollector):
 
             team_to_manager[roster["roster_id"]].append(roster["owner_id"])
             logger.debug(
-                f"In {self._config.year}, found manager {managers_result['owner_id'].name} for "
+                f"In {self._config.year}, found manager {managers_result[roster['owner_id']].name} for "
                 f"team {roster['roster_id']}"
             )
 
@@ -276,7 +283,7 @@ class SleeperCollector(ICollector):
                     f'{roster["settings"]["fpts"]}.{roster["settings"]["fpts_decimal"]}'
                 ),
                 points_against=float(
-                    f'{roster["settings"]["fpts_against"]}."'
+                    f'{roster["settings"]["fpts_against"]}.'
                     f'{roster["settings"]["fpts_against_decimal"]}'
                 ),
                 roster_id=roster["roster_id"],

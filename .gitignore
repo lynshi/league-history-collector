@@ -132,3 +132,4 @@ dmypy.json
 *.json
 !pyrightconfig.json
 *.png
+.DS_Store

@@ -1,4 +1,4 @@
-"""Collects league history."""
+"""Collects league history for NFL Fantasy."""
 
 import argparse
 import json
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Collects fantasy football league history")
     parser.add_argument(
-        "-c", "--config", help="Path to configuration file", default="config.json"
+        "-c", "--config", help="Path to configuration file", default="nfl.json"
     )
 
     args = parser.parse_args()
