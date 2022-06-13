@@ -370,10 +370,12 @@ class SleeperCollector(ICollector):
             roster = set(team_week["players"])
             starters = set(team_week["starters"])
             try:
-                starters.remove("0")  # '0' is a 'starter' if the position has no player assigned.
+                starters.remove(
+                    "0"
+                )  # '0' is a 'starter' if the position has no player assigned.
             except KeyError:
                 pass
-    
+
             bench = roster.difference(starters)
             team_data = TeamGameData(
                 points=team_week["points"],

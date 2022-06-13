@@ -133,3 +133,4 @@ dmypy.json
 !pyrightconfig.json
 *.png
 .DS_Store
+data
