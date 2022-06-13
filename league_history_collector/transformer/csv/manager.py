@@ -35,7 +35,9 @@ def set_managers(
                 managers_output[row["manager_id"]] = row["manager_name"]
 
     for m_id, manager in managers.items():
-        managers_output[id_mapper(m_id)] = managers_output.get(id_mapper(m_id), manager.name)
+        managers_output[id_mapper(m_id)] = managers_output.get(
+            id_mapper(m_id), manager.name
+        )
 
     with open(file_name, "w", encoding="utf-8") as outfile:
         fieldnames = ["manager_id", "manager_name"]

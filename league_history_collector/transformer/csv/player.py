@@ -8,7 +8,9 @@ from loguru import logger
 from league_history_collector.collectors.models import League
 
 
-def set_players(file_name: str, league: League, deduplicate: bool):
+def set_players(
+    file_name: str, league: League, deduplicate: bool
+):  # pylint: disable=too-many-locals,too-many-nested-blocks,too-many-branches
     """Sets the players in the provided CSV. If the CSV already exists, players are loaded from file
     to help reduce duplicates.
 
