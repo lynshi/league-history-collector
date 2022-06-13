@@ -8,7 +8,7 @@ from loguru import logger
 
 from league_history_collector.collectors.models import League
 from league_history_collector.transformer.csv.finish import set_finish
-from league_history_collector.transformer.csv.games import set_games
+from league_history_collector.transformer.csv.game import set_games
 from league_history_collector.transformer.csv.manager import set_managers
 from league_history_collector.transformer.csv.player import set_players
 from league_history_collector.transformer.csv.season import set_season

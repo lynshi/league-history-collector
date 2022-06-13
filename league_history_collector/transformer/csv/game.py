@@ -42,7 +42,6 @@ def set_games(
                 first_team_data = game.team_data[0]
                 second_team_data = game.team_data[1]
 
-                # Manager id, season id, week id, points, opponent id, result
                 first_team_result = (
                     "win"
                     if first_team_data.points > second_team_data.points
