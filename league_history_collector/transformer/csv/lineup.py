@@ -9,24 +9,25 @@ from loguru import logger
 from league_history_collector.collectors.models import League
 
 
-def set_lineup(
+def set_lineups(
     file_name: str,
     league: League,
     manager_id_mapper: Callable[[str], str],
-    player_id_mapper: Callable[[str], str],
-):  # pylint: disable=too-many-locals
+    player_id_mapper: Callable[[str, str, str], str],
+):  # pylint: disable=too-many-locals,too-many-nested-blocks
     """Sets lineups in the league.
 
     :param file_name: Name of the CSV to write data to. If it exists, data is appended.
     :type file_name: str
     :param league: League data.
     :type league: League
-    :param manager_id_mapper: A method for mapping incoming manager ids to ids in the file. Useful if
-        different ids can represent the same manager.
+    :param manager_id_mapper: A method for mapping incoming manager ids to ids in the file. Useful
+        if different ids can represent the same manager.
     :type manager_id_mapper: Callable[[str], str]
     :param player_id_mapper: A method for mapping incoming player ids to ids in the file. Useful if
-        different ids can represent the same player.
-    :type player_id_mapper: Callable[[str], str]
+        different ids can represent the same player. The input is
+        (player_id, player_name, player_position).
+    :type player_id_mapper: Callable[[str, str, str], str]
     """
 
     lineup_results = []
@@ -35,7 +36,7 @@ def set_lineup(
         for week_id, week in season.weeks.items():
             for game_id, game in enumerate(week.games):
                 logger.debug(
-                    f"Getting data for game {game_id} in week {week_id} of {season_id}"
+                    f"Getting lineup data for game {game_id} in week {week_id} of {season_id}"
                 )
 
                 if len(game.team_data) != 2:
@@ -56,7 +57,9 @@ def set_lineup(
                                     "manager_id": m_id,
                                     "season_id": season_id,
                                     "week_id": week_id,
-                                    "player_id": player_id_mapper(starter.id),
+                                    "player_id": player_id_mapper(
+                                        starter.id, starter.name, starter.position
+                                    ),
                                     "is_starter": True,
                                 }
                             )
@@ -67,7 +70,11 @@ def set_lineup(
                                     "manager_id": m_id,
                                     "season_id": season_id,
                                     "week_id": week_id,
-                                    "player_id": player_id_mapper(bench_player.id),
+                                    "player_id": player_id_mapper(
+                                        bench_player.id,
+                                        bench_player.name,
+                                        bench_player.position,
+                                    ),
                                     "is_starter": True,
                                 }
                             )
