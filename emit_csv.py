@@ -31,16 +31,16 @@ def main():  # pylint: disable=too-many-locals
 
     os.makedirs(data_dir)
 
-    with open("manager_mapping.json", encoding="utf-8") as infile:
-        id_mapping_from_file = json.load(infile)
+    with open("manager_mapping.json", encoding="utf-8") as manager_mapping_file:
+        id_mapping_from_file = json.load(manager_mapping_file)
 
     mapping_from_file = lambda s: id_mapping_from_file.get(s, s)
 
     for season in SEASONS:
         file = os.path.join(file_dir, f"{season}.json")
         logger.debug(f"Loading {file}")
-        with open(file, encoding="utf-8") as infile:
-            league = League.from_dict(json.load(infile))
+        with open(file, encoding="utf-8") as season_data_file:
+            league = League.from_dict(json.load(season_data_file))
 
         logger.info(f"Loaded data from {file}")
 
@@ -67,16 +67,17 @@ def main():  # pylint: disable=too-many-locals
         games_csv = os.path.join(data_dir, "games.csv")
         set_games(games_csv, league, manager_id_mapper)
 
-        with open(players_csv, encoding="utf-8") as infile:
-            csv_reader = csv.DictReader(infile)
+        logger.info(f"Loading player ids mapping from {players_csv}")
+        with open(players_csv, encoding="utf-8") as emitted_players:
+            csv_reader = csv.DictReader(emitted_players)
 
-        player_mapping = {}
-        for row in csv_reader:
-            player_tuple = (row["player_name"], row["player_position"])
-            if player_tuple not in player_mapping:
-                player_mapping[player_tuple] = set()
+            player_mapping = {}
+            for row in csv_reader:
+                player_tuple = (row["player_name"], row["player_position"])
+                if player_tuple not in player_mapping:
+                    player_mapping[player_tuple] = set()
 
-            player_mapping[player_tuple].add(row["player_id"])
+                player_mapping[player_tuple].add(row["player_id"])
 
         def player_mapper(p_id: str, p_name: str, p_pos: str):
             input_tuple = (p_name, p_pos)

@@ -75,7 +75,7 @@ def set_lineups(
                                         bench_player.name,
                                         bench_player.position,
                                     ),
-                                    "is_starter": True,
+                                    "is_starter": False,
                                 }
                             )
 
