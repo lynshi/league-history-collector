@@ -9,7 +9,11 @@ from loguru import logger
 from league_history_collector.collectors.models import Manager
 
 
-def set_managers(file_name: str, managers: Dict[str, Manager], id_mapper: Callable[[str], str] = lambda x: x):
+def set_managers(
+    file_name: str,
+    managers: Dict[str, Manager],
+    id_mapper: Callable[[str], str] = lambda x: x,
+):
     """Sets the managers in the provided CSV. If the CSV already exists, duplicate managers (by id)
     are updated with values from the latest data.
 
@@ -21,7 +25,7 @@ def set_managers(file_name: str, managers: Dict[str, Manager], id_mapper: Callab
         ids can represent the same manager.
     :type id_mapper: Callable[[str], str], optional
     """
-    
+
     managers_output = {}
     if os.path.isfile(file_name):
         logger.info(f"{file_name} exists, loading existing managers")
@@ -39,4 +43,4 @@ def set_managers(file_name: str, managers: Dict[str, Manager], id_mapper: Callab
 
         writer.writeheader()
         for m_id, m_name in managers_output.items():
-            writer.writerow({'manager_id': m_id, 'manager_name': m_name})
+            writer.writerow({"manager_id": m_id, "manager_name": m_name})

@@ -7,8 +7,12 @@ from loguru import logger
 
 from league_history_collector.collectors.models import League
 from league_history_collector.transformer.csv.manager import set_managers
+from league_history_collector.transformer.csv.player import set_players
 
-SEASONS = [year for year in range(2013, 2022)]
+# Reverse sorting because the range looks nicer defined in increasing order :)
+# We migrated to Sleeper in 2021.
+SEASONS = sorted([year for year in range(2013, 2022)], reverse=True)
+
 
 def main():
     file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +35,11 @@ def main():
             id_mapper = lambda s: s
 
         set_managers(managers_csv, league.managers, id_mapper)
+
+        players_csv = os.path.join(file_dir, "data/players.csv")
+        set_players(
+            players_csv, league, deduplicate=season < 2021
+        )  # Remap ids used in NFL Fantasy
 
 
 if __name__ == "__main__":
