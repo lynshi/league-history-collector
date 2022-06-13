@@ -129,5 +129,7 @@ dmypy.json
 .pyre/
 
 .vscode
-config.json
+*.json
+!pyrightconfig.json
 *.png
+.DS_Store

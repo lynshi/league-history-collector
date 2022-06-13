@@ -1,7 +1,7 @@
 # pylint: disable=missing-module-docstring
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 from league_history_collector.models import Record
 from league_history_collector.collectors.models.week import Week
@@ -12,7 +12,7 @@ from league_history_collector.utils import CamelCasedDataclass
 class FinalStanding(CamelCasedDataclass):
     """Contains details about the final standing."""
 
-    rank: int
+    rank: Optional[int]
 
 
 @dataclass
