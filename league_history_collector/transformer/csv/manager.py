@@ -15,7 +15,7 @@ def set_managers(
     id_mapper: Callable[[str], str],
 ):
     """Sets the managers in the provided CSV. If the CSV already exists, duplicate managers (by id)
-    are updated with values from the latest data.
+    are skipped.
 
     :param file_name: Name of the CSV to write data to, and if, already existing, load data from.
     :type file_name: str
@@ -35,7 +35,7 @@ def set_managers(
                 managers_output[row["manager_id"]] = row["manager_name"]
 
     for m_id, manager in managers.items():
-        managers_output[id_mapper(m_id)] = manager.name
+        managers_output[id_mapper(m_id)] = managers_output.get(id_mapper(m_id), manager.name)
 
     with open(file_name, "w", encoding="utf-8") as outfile:
         fieldnames = ["manager_id", "manager_name"]
