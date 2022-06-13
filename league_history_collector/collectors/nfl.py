@@ -410,10 +410,10 @@ class NFLCollector(ICollector):  # pylint: disable=too-few-public-methods
         matchup_items = schedule_content.find_elements_by_class_name("matchup")
 
         matchups = []
-        for matchup_iteam in matchup_items:
+        for matchup_item in matchup_items:
             team_ids = set()
 
-            team_links = matchup_iteam.find_elements_by_class_name("teamName")
+            team_links = matchup_item.find_elements_by_class_name("teamName")
             for team_link in team_links:
                 team_id = self._get_team_id_from_link(team_link)
                 team_ids.add(team_id)

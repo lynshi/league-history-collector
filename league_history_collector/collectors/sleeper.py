@@ -18,8 +18,9 @@ from league_history_collector.collectors.models import (
     ManagerStanding,
     RegularSeasonStanding,
     Season,
+    Week,
 )
-from league_history_collector.models.record import Record
+from league_history_collector.models import Game, Record, Roster, TeamGameData
 from league_history_collector.utils import CamelCasedDataclass
 
 
@@ -37,7 +38,9 @@ class SleeperCollector(ICollector):
 
     _all_players_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/players/nfl"
     _managers_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/users"
-    _matchups_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/matchups/{}"
+    _matchups_endpoint: ClassVar[
+        str
+    ] = "https://api.sleeper.app/v1/league/{}/matchups/{}"
     _playoffs_endpoint: ClassVar[
         str
     ] = "https://api.sleeper.app/v1/league/{}/winners_bracket"
@@ -87,7 +90,7 @@ class SleeperCollector(ICollector):
         # Get and populate games information.
         weeks_in_league = self._get_weeks()
         for week in weeks_in_league:
-            week_data = self._get_games_for_week(year, week, team_to_manager)
+            week_data = self._get_games_for_week(week, team_to_manager)
             league.seasons[year].weeks[week] = week_data
 
     def _update_players(self) -> Dict[str, Any]:
@@ -188,13 +191,18 @@ class SleeperCollector(ICollector):
             ):
                 continue
 
-            final_standings[team_to_manager[matchup["w"]]] = FinalStanding(1)
-            final_standings[team_to_manager[matchup["l"]]] = FinalStanding(2)
+            managers = team_to_manager[matchup["w"]]
+            for manager_id in managers:
+                final_standings[manager_id] = FinalStanding(1)
+
+            managers = team_to_manager[matchup["l"]]
+            for manager_id in managers:
+                final_standings[manager_id] = FinalStanding(2)
             break
 
         assert (
-            len(final_standings) == 2
-        ), f"Expected two managers in final standings, got {final_standings}"
+            final_standings
+        ), f"Expected final standings to be populated, got {final_standings}"
         logger.debug(f"Final standings in {self._config.year}: {final_standings}")
         return final_standings
 
@@ -221,7 +229,10 @@ class SleeperCollector(ICollector):
 
         team_to_manager = {}
         for roster in rosters_data:
-            team_to_manager[roster["roster_id"]] = roster["owner_id"]
+            if roster["roster_id"] not in team_to_manager:
+                team_to_manager[roster["roster_id"]] = []
+
+            team_to_manager[roster["roster_id"]].append(roster["owner_id"])
             logger.debug(
                 f"In {self._config.year}, found manager {managers_result['owner_id'].name} for "
                 f"team {roster['roster_id']}"
@@ -275,19 +286,20 @@ class SleeperCollector(ICollector):
             key=lambda t: (t.wins, t.ties, t.points_for, t.points_against), reverse=True
         )
 
-        regular_season_standings = {
-            team[team_to_manager[team.roster_id]]: RegularSeasonStanding(
-                rank=i + 1,
-                points_scored=team.points_for,
-                points_against=team.points_against,
-                record=Record(
-                    wins=team.wins,
-                    ties=team.ties,
-                    losses=team.losses,
-                ),
-            )
-            for i, team in enumerate(teams)
-        }
+        regular_season_standings = {}
+        for i, team in enumerate(teams):
+            managers = team_to_manager[team.roster_id]
+            for manager_id in managers:
+                regular_season_standings[manager_id] = RegularSeasonStanding(
+                    rank=i + 1,
+                    points_scored=team.points_for,
+                    points_against=team.points_against,
+                    record=Record(
+                        wins=team.wins,
+                        ties=team.ties,
+                        losses=team.losses,
+                    ),
+                )
 
         for manager_id, standing in regular_season_standings.items():
             logger.debug(
@@ -304,8 +316,12 @@ class SleeperCollector(ICollector):
         # We'll exclude weeks without games. Since there might be a week with no games if we decide
         # to introduce bye weeks (...?), let's just count until a large number.
         for week_id in range(1, 32):
-            week_uri = SleeperCollector._matchups_endpoint.format(self._config.league_id, week_id)
-            logger.info(f"Checking if there are any games in week {week_id} at {week_uri}")
+            week_uri = SleeperCollector._matchups_endpoint.format(
+                self._config.league_id, week_id
+            )
+            logger.info(
+                f"Checking if there are any games in week {week_id} at {week_uri}"
+            )
 
             response = requests.get(week_uri)
             response.raise_for_status()
@@ -313,9 +329,56 @@ class SleeperCollector(ICollector):
 
             if week_data:
                 weeks.add(week_id)
+                logger.debug(f"Week {week_id} in season {self._config.year} has games")
+            else:
+                logger.debug(
+                    f"Week {week_id} in season {self._config.year} has no games"
+                )
 
         logger.debug(f"Weeks with games: {weeks}")
         return weeks
+
+    def _get_games_for_week(  # pylint: disable=too-many-locals
+        self, week: int, team_to_manager: Dict[str, List[str]]
+    ) -> Week:
+        week_uri = SleeperCollector._matchups_endpoint.format(
+            self._config.league_id, week
+        )
+        logger.info(f"Getting games in week {week} at {week_uri}")
+
+        response = requests.get(week_uri)
+        response.raise_for_status()
+        week_data = response.json()
+
+        matchup_results: Dict[int, Game] = {}
+        for team_week in week_data:
+            if team_week["matchup_id"] not in matchup_results:
+                matchup_results[team_week["matchup_id"]] = Game(team_data=[])
+
+            logger.debug(
+                f"Adding {team_week['roster_id']} to matchup {team_week['matchup_id']} week {week} "
+                f"in {self._config.year}"
+            )
+
+            roster = set(team_week["players"])
+            starters = set(team_week["starters"])
+            bench = roster.difference(starters)
+            team_data = TeamGameData(
+                points=team_week["points"],
+                managers=team_to_manager[team_week["roster_id"]],
+                roster=Roster(
+                    starters=team_week["starters"],
+                    bench=list(bench),
+                ),
+            )
+
+            matchup_results[team_week["matchup_id"]].team_data.append(team_data)
+
+        game_results: List[Game] = []
+        for matchup in matchup_results.values():
+            game_results.append(matchup)
+
+        return Week(games=game_results)
 
     @staticmethod
     def _get_players() -> Dict[str, Any]:
