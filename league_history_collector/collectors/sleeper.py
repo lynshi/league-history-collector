@@ -21,7 +21,7 @@ from league_history_collector.collectors.models import (
     Season,
     Week,
 )
-from league_history_collector.models import Game, Record, Roster, TeamGameData
+from league_history_collector.models import Game, Player, Record, Roster, TeamGameData
 
 
 @dataclass
@@ -112,7 +112,7 @@ class SleeperCollector(ICollector):
 
         return players
 
-    def _get_final_standings(
+    def _get_final_standings(  # pylint: disable=too-many-locals,too-many-branches
         self, team_to_manager: Dict[str, List[str]]
     ) -> Dict[str, FinalStanding]:
         # We don't actually care about the final standings, only the winner and runner-up, as nobody
@@ -154,13 +154,13 @@ class SleeperCollector(ICollector):
 
             t1_from = matchup.get("t1_from", None)
             if t1_from:
-                w = t1_from.get("w", None)
+                w = t1_from.get("w", None)  # pylint: disable=invalid-name
                 if w is None or w not in valid_matchups:
                     continue
 
             t2_from = matchup.get("t2_from", None)
             if t2_from:
-                w = t2_from.get("w", None)
+                w = t2_from.get("w", None)  # pylint: disable=invalid-name
                 if w is None or w not in valid_matchups:
                     continue
 
@@ -241,8 +241,8 @@ class SleeperCollector(ICollector):
 
             team_to_manager[roster["roster_id"]].append(roster["owner_id"])
             logger.debug(
-                f"In {self._config.year}, found manager {managers_result[roster['owner_id']].name} for "
-                f"team {roster['roster_id']}"
+                f"In {self._config.year}, found manager {managers_result[roster['owner_id']].name} "
+                f"for team {roster['roster_id']}"
             )
 
         logger.debug(f"Team to manager mapping: {team_to_manager}")
@@ -369,13 +369,36 @@ class SleeperCollector(ICollector):
 
             roster = set(team_week["players"])
             starters = set(team_week["starters"])
+            try:
+                starters.remove("0")  # '0' is a 'starter' if the position has no player assigned.
+            except KeyError:
+                pass
+    
             bench = roster.difference(starters)
             team_data = TeamGameData(
                 points=team_week["points"],
                 managers=team_to_manager[team_week["roster_id"]],
                 roster=Roster(
-                    starters=team_week["starters"],
-                    bench=list(bench),
+                    starters=[
+                        Player(
+                            id=s,
+                            name=self._players[s]["first_name"]
+                            + " "
+                            + self._players[s]["last_name"],
+                            position=self._players[s]["position"],
+                        )
+                        for s in starters
+                    ],
+                    bench=[
+                        Player(
+                            id=b,
+                            name=self._players[b]["first_name"]
+                            + " "
+                            + self._players[b]["last_name"],
+                            position=self._players[b]["position"],
+                        )
+                        for b in bench
+                    ],
                 ),
             )
 

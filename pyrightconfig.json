@@ -1,5 +1,5 @@
 {
   "include": [
-    "collector.py", "league_history_collector", "test", "test_script.py"
+    "league_history_collector", "nfl.py", "sleeper.py", "test", "test_script.py"
   ]
 }

@@ -7,7 +7,6 @@ import sys
 from loguru import logger
 
 from league_history_collector.collectors import SleeperConfiguration, SleeperCollector
-from league_history_collector.collectors.models import League
 
 
 def run_collector(collector_config: SleeperConfiguration):
