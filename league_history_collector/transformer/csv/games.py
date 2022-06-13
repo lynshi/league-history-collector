@@ -9,7 +9,9 @@ from loguru import logger
 from league_history_collector.collectors.models import League
 
 
-def set_games(file_name: str, league: League, id_mapper: Callable[[str], str]):
+def set_games(
+    file_name: str, league: League, id_mapper: Callable[[str], str]
+):  # pylint: disable=too-many-locals
     """Sets games in the league.
 
     :param file_name: Name of the CSV to write data to. If it exists, data is appended.
@@ -29,9 +31,13 @@ def set_games(file_name: str, league: League, id_mapper: Callable[[str], str]):
                 logger.debug(
                     f"Getting data for game {game_id} in week {week_id} of {season_id}"
                 )
-                assert (
-                    len(game.team_data) == 2
-                ), f"Expected two items in game.team_data, got {len(game.team_data)}"
+
+                if len(game.team_data) != 2:
+                    logger.warning(
+                        f"More than 2 teams present in game {game_id} in week {week_id} of "
+                        f"{season_id}, skipping"
+                    )
+                    continue
 
                 first_team_data = game.team_data[0]
                 second_team_data = game.team_data[1]

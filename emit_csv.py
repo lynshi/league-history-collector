@@ -8,6 +8,7 @@ from loguru import logger
 
 from league_history_collector.collectors.models import League
 from league_history_collector.transformer.csv.finish import set_finish
+from league_history_collector.transformer.csv.games import set_games
 from league_history_collector.transformer.csv.manager import set_managers
 from league_history_collector.transformer.csv.player import set_players
 from league_history_collector.transformer.csv.season import set_season
@@ -60,6 +61,9 @@ def main():
 
         finish_csv = os.path.join(data_dir, "finish.csv")
         set_finish(finish_csv, league, manager_id_mapper)
+
+        games_csv = os.path.join(data_dir, "games.csv")
+        set_games(games_csv, league, manager_id_mapper)
 
 
 if __name__ == "__main__":
