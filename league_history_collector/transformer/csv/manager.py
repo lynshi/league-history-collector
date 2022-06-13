@@ -12,7 +12,7 @@ from league_history_collector.collectors.models import Manager
 def set_managers(
     file_name: str,
     managers: Dict[str, Manager],
-    id_mapper: Callable[[str], str] = lambda x: x,
+    id_mapper: Callable[[str], str],
 ):
     """Sets the managers in the provided CSV. If the CSV already exists, duplicate managers (by id)
     are updated with values from the latest data.
@@ -21,9 +21,9 @@ def set_managers(
     :type file_name: str
     :param managers: Mapping of manager ids to managers.
     :type managers: Dict[str, Manager]
-    :param id_mapper: A method for mapping ids to ids, defaults to lambdax:x. Useful if different
-        ids can represent the same manager.
-    :type id_mapper: Callable[[str], str], optional
+    :param id_mapper: A method for mapping incoming ids to ids in the file. Useful if different ids
+        can represent the same manager.
+    :type id_mapper: Callable[[str], str]
     """
 
     managers_output = {}

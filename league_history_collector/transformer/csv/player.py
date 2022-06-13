@@ -2,7 +2,6 @@
 
 import csv
 import os
-from typing import Callable, Dict
 
 from loguru import logger
 
@@ -47,17 +46,18 @@ def set_players(file_name: str, league: League, deduplicate: bool):
                     for player in team_data.roster.starters:
                         player_tup = (player.name, player.position)
                         potential_ids = players_output.get(player_tup, {player.id})
-                        if len(potential_ids) != 1:
+                        if not deduplicate or len(potential_ids) != 1:
                             potential_ids.add(player.id)
                         players_output[player_tup] = potential_ids
 
                     for player in team_data.roster.bench:
                         player_tup = (player.name, player.position)
                         potential_ids = players_output.get(player_tup, {player.id})
-                        if len(potential_ids) != 1:
+                        if not deduplicate or len(potential_ids) != 1:
                             potential_ids.add(player.id)
                         players_output[player_tup] = potential_ids
 
+    logger.info(f"Writing players to {file_name}")
     with open(file_name, "w", encoding="utf-8") as outfile:
         fieldnames = ["player_id", "player_name", "player_position"]
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
