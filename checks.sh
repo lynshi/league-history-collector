@@ -3,7 +3,7 @@
 # Change these parameter values for your project.
 MAIN="nfl.py sleeper.py test_script.py"
 PACKAGES="league_history_collector"
-MINIMUM_CODE_COVERAGE=50
+MINIMUM_CODE_COVERAGE=25
 UNIT_TEST_DIRECTORY="test"
 
 # For coloring terminal output.
