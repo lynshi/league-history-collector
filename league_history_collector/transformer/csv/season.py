@@ -23,7 +23,7 @@ def set_season(file_name: str, league: League, id_mapper: Callable[[str], str]):
 
     season_results = []
     for season_id, season in league.seasons.items():
-        logger.info(f"Getting results for {season_id}")
+        logger.info(f"Getting regular season standings for {season_id}")
         for m_id, m_standing in season.standings.items():
             logger.debug(f"Getting results for {m_id} in {season_id}")
             season_results.append(
