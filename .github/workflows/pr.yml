@@ -30,7 +30,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: Install pyright
       run: |
-        npm install -g pyright
+        npm install -g pyright@1.1.206
     - name: Run checks script and generate coverage report.
       run: |
         ./checks.sh
