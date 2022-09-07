@@ -15,6 +15,7 @@ import requests
 
 from league_history_collector.collectors.base import ICollector
 from league_history_collector.collectors.models import (
+    Draft,
     FinalStanding,
     League,
     Manager,
@@ -23,6 +24,7 @@ from league_history_collector.collectors.models import (
     Season,
     Week,
 )
+from league_history_collector.collectors.models.draft import DraftPick
 from league_history_collector.models import Game, Player, Record, Roster, TeamGameData
 
 
@@ -38,6 +40,10 @@ class SleeperCollector(ICollector):
     """Collector for fantasy football leagues on Sleeper."""
 
     _all_players_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/players/nfl"
+    _draft_picks_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/draft/{}/picks"
+    _league_drafts_endpoint: ClassVar[
+        str
+    ] = "https://api.sleeper.app/v1/league/{}/drafts"
     _managers_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/users"
     _matchups_endpoint: ClassVar[
         str
@@ -125,6 +131,10 @@ class SleeperCollector(ICollector):
                 regular_season_standing=regular_season_standings[manager_id],
             )
             league.seasons[year].standings[manager_id] = manager_standing
+
+        # Get info about the draft.
+        draft = self._get_draft(year)
+        league.seasons[year].draft_results = draft
 
         # Get and populate games information.
         weeks_in_league = self._get_weeks(year)
@@ -355,6 +365,45 @@ class SleeperCollector(ICollector):
             )
 
         return regular_season_standings
+
+    def _get_draft(self, year: int) -> Draft:
+        drafts_endpoint = SleeperCollector._league_drafts_endpoint.format(
+            self.season_to_id[year]
+        )
+        logger.info(f"Getting drafts for {year} from {drafts_endpoint}")
+
+        drafts_response = requests.get(drafts_endpoint)
+        drafts_response.raise_for_status()
+
+        drafts = []
+
+        # According to API docs there may be multiple drafts for a dynasty league. I don't know what
+        # this means, but ok!
+        for draft in drafts_response.json():
+            draft_id = draft["draft_id"]
+            picks_endpoint = SleeperCollector._draft_picks_endpoint.format(draft_id)
+            logger.info(f"Getting draft for {year} from {picks_endpoint}")
+
+            picks_response = requests.get(picks_endpoint)
+            picks_response.raise_for_status()
+
+            draft_picks = []
+            picks_data = picks_response.json()
+            for pick in picks_data:
+                draft_picks.append(
+                    DraftPick(
+                        round=pick["round"],
+                        round_slot=pick["draft_slot"],
+                        overall_pick=pick["pick_no"],
+                        player_id=pick["player_id"],
+                        player_position=pick["metadata"]["position"],
+                        manager_id=pick["picked_by"],
+                    )
+                )
+
+            drafts.append(draft_picks)
+
+        return Draft(drafts)
 
     def _get_weeks(self, year: int) -> Set[int]:
         weeks = set()

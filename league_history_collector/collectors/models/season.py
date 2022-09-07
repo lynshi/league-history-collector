@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from dataclasses_json.cfg import config
 
 from league_history_collector.models import Record
+from league_history_collector.collectors.models.draft import Draft
 from league_history_collector.collectors.models.week import Week
 from league_history_collector.utils import CamelCasedDataclass
 
@@ -46,5 +47,8 @@ class Season(CamelCasedDataclass):
 
     # Platforms like Sleeper have a different league id per season.
     league_id: Optional[int] = field(
+        default=None, metadata=config(exclude=lambda val: val is None)  # type: ignore
+    )
+    draft_results: Optional[Draft] = field(
         default=None, metadata=config(exclude=lambda val: val is None)  # type: ignore
     )
