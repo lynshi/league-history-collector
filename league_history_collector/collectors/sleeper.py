@@ -396,6 +396,9 @@ class SleeperCollector(ICollector):
                         round_slot=pick["draft_slot"],
                         overall_pick=pick["pick_no"],
                         player_id=pick["player_id"],
+                        player_name=pick["metadata"]["first_name"]
+                        + " "
+                        + pick["metadata"]["last_name"],
                         player_position=pick["metadata"]["position"],
                         manager_id=pick["picked_by"],
                     )

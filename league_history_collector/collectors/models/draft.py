@@ -14,6 +14,7 @@ class DraftPick(CamelCasedDataclass):
     round_slot: int
     overall_pick: int
     player_id: str
+    player_name: str
     player_position: str
     manager_id: str
 
