@@ -1,3 +1,5 @@
+# pylint: disable=duplicate-code
+
 """For collection league data from NFL Fantasy."""
 
 from __future__ import annotations

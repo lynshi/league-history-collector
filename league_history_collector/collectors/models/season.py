@@ -1,7 +1,9 @@
 # pylint: disable=missing-module-docstring
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
+
+from dataclasses_json.cfg import config
 
 from league_history_collector.models import Record
 from league_history_collector.collectors.models.week import Week
@@ -41,3 +43,8 @@ class Season(CamelCasedDataclass):
 
     standings: Dict[str, ManagerStanding]
     weeks: Dict[int, Week]
+
+    # Platforms like Sleeper have a different league id per season.
+    league_id: Optional[int] = field(
+        default=None, metadata=config(exclude=lambda val: val is None)  # type: ignore
+    )

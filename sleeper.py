@@ -1,3 +1,5 @@
+# pylint: disable=protected-access,duplicate-code
+
 """Collects league history for Sleeper."""
 
 import argparse
@@ -7,16 +9,22 @@ import sys
 from loguru import logger
 
 from league_history_collector.collectors import SleeperConfiguration, SleeperCollector
+from league_history_collector.collectors.models import League
 
 
 def run_collector(collector_config: SleeperConfiguration):
     """Runs a collector on the league specified by the provided configuration."""
 
     collector = SleeperCollector(collector_config)
-    season_data = collector.save_all_data()
+    seasons = collector.get_seasons()
 
-    with open(f"{collector_config.year}.json", "w") as outfile:
-        json.dump(season_data.to_dict(), outfile, sort_keys=True, indent=2)
+    for year in seasons:
+        with open(f"{year}.json", "w") as outfile:
+            league = League(id=collector.season_to_id[year], managers={}, seasons={})
+            collector.set_season_data(year, league)
+
+            with open(f"{year}.json", "w") as outfile:
+                json.dump(league.to_dict(), outfile, sort_keys=True, indent=2)
 
 
 if __name__ == "__main__":
