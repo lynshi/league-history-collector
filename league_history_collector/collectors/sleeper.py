@@ -280,11 +280,12 @@ class SleeperCollector(ICollector):
                 ties=roster["settings"]["ties"],
                 losses=roster["settings"]["losses"],
                 points_for=float(
-                    f'{roster["settings"]["fpts"]}.{roster["settings"]["fpts_decimal"]}'
+                    f'{roster["settings"]["fpts"]}.'
+                    f'{str(roster["settings"]["fpts_decimal"]).zfill(2)}'
                 ),
                 points_against=float(
                     f'{roster["settings"]["fpts_against"]}.'
-                    f'{roster["settings"]["fpts_against_decimal"]}'
+                    f'{str(roster["settings"]["fpts_against_decimal"]).zfill(2)}'
                 ),
                 roster_id=roster["roster_id"],
             )
