@@ -1,3 +1,5 @@
+# pylint: disable=protected-access,duplicate-code
+
 """Collects league history for NFL Fantasy."""
 
 import argparse

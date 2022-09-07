@@ -1,4 +1,4 @@
-# pylint: disable=protected-access
+# pylint: disable=protected-access,duplicate-code
 
 """Script for testing functionality."""
 

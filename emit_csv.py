@@ -8,6 +8,7 @@ import shutil
 from loguru import logger
 
 from league_history_collector.collectors.models import League
+from league_history_collector.transformer.csv.draft import set_drafts
 from league_history_collector.transformer.csv.finish import set_finish
 from league_history_collector.transformer.csv.game import set_games
 from league_history_collector.transformer.csv.lineup import set_lineups
@@ -17,7 +18,7 @@ from league_history_collector.transformer.csv.season import set_season
 
 # Reverse sorting because the range looks nicer defined in increasing order :)
 # We migrated to Sleeper in 2021.
-SEASONS = sorted(range(2013, 2022), reverse=True)
+SEASONS = sorted(range(2013, 2023), reverse=True)
 
 
 def main():  # pylint: disable=too-many-locals
@@ -81,9 +82,9 @@ def main():  # pylint: disable=too-many-locals
 
         def player_mapper(p_id: str, p_name: str, p_pos: str):
             input_tuple = (p_name, p_pos)
-            potential_ids = player_mapping[  # pylint: disable=cell-var-from-loop
-                input_tuple
-            ]
+            potential_ids = player_mapping.get(  # pylint: disable=cell-var-from-loop
+                input_tuple, []
+            )
             if len(potential_ids) == 1:
                 for assigned_id in potential_ids:
                     return assigned_id
@@ -93,6 +94,9 @@ def main():  # pylint: disable=too-many-locals
 
         lineups_csv = os.path.join(data_dir, "lineups.csv")
         set_lineups(lineups_csv, league, manager_id_mapper, player_mapper)
+
+        drafts_csv = os.path.join(data_dir, "drafts.csv")
+        set_drafts(drafts_csv, league, manager_id_mapper, player_mapper)
 
 
 if __name__ == "__main__":

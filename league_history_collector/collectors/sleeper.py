@@ -1,3 +1,5 @@
+# pylint: disable=too-many-locals,duplicate-code
+
 """Collector for Sleeper leagues."""
 
 from collections import namedtuple
@@ -13,6 +15,7 @@ import requests
 
 from league_history_collector.collectors.base import ICollector
 from league_history_collector.collectors.models import (
+    Draft,
     FinalStanding,
     League,
     Manager,
@@ -21,6 +24,7 @@ from league_history_collector.collectors.models import (
     Season,
     Week,
 )
+from league_history_collector.collectors.models.draft import DraftPick
 from league_history_collector.models import Game, Player, Record, Roster, TeamGameData
 
 
@@ -30,17 +34,22 @@ class SleeperConfiguration(DataClassJsonMixin):
 
     league_id: str
     players_file: str
-    year: int
 
 
 class SleeperCollector(ICollector):
     """Collector for fantasy football leagues on Sleeper."""
 
     _all_players_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/players/nfl"
+    _draft_picks_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/draft/{}/picks"
+    _league_drafts_endpoint: ClassVar[
+        str
+    ] = "https://api.sleeper.app/v1/league/{}/drafts"
     _managers_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}/users"
     _matchups_endpoint: ClassVar[
         str
     ] = "https://api.sleeper.app/v1/league/{}/matchups/{}"
+    _nfl_state_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/state/nfl"
+    _league_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}"
     _playoffs_endpoint: ClassVar[
         str
     ] = "https://api.sleeper.app/v1/league/{}/winners_bracket"
@@ -52,26 +61,62 @@ class SleeperCollector(ICollector):
         self._config = config
         self._players = self._update_players()
 
+        self._create_season_id_mappings()
+
+    def _create_season_id_mappings(self) -> None:
+        """Creates mappings between seasons and league ids as Sleeper creates a new league for each
+        season.
+        """
+        self.season_to_id = {}
+        self.id_to_season = {}
+
+        next_league_id = self._config.league_id
+        while next_league_id is not None:
+            current_league_id = next_league_id
+            endpoint = SleeperCollector._league_endpoint.format(current_league_id)
+            response = requests.get(endpoint)
+            response.raise_for_status()
+            response_json = response.json()
+
+            current_season = int(response_json["season"])
+            self.season_to_id[current_season] = current_league_id
+            self.id_to_season[current_league_id] = current_season
+
+            next_league_id = response_json["previous_league_id"]
+
     def get_seasons(self) -> List[int]:
-        raise NotImplementedError(
-            "Not implemented for Sleeper, as league ids uniquely identify a season"
-        )
+        return sorted(list(self.season_to_id.keys()), reverse=True)
 
     def save_all_data(self) -> League:
         league = League(self._config.league_id, managers={}, seasons={})
-        self.set_season_data(self._config.year, league)
+        seasons = self.get_seasons()
+        for year in seasons:
+            self.set_season_data(year, league)
+
         return league
 
     def set_season_data(self, year: int, league: League):
         # Get mapping of team ID to manager ID, and list of managers for the year.
-        team_to_manager, managers = self._get_managers()
+        team_to_manager, managers = self._get_managers(year)
 
         # Set up empty object.
-        league.seasons[year] = Season(standings={}, weeks={})
+        league.seasons[year] = Season(
+            standings={}, weeks={}, league_id=self.season_to_id[year]
+        )
 
-        # Collect standings information.
-        final_standings = self._get_final_standings(team_to_manager)
-        regular_season_standings = self._get_regular_season_standings(team_to_manager)
+        # # Collect standings information.
+        final_standings = {}
+        try:
+            final_standings = self._get_final_standings(year, team_to_manager)
+        except KeyError:
+            # Final standings won't be available until the season ends, so this is likely ok.
+            logger.opt(exception=True).warning(
+                "Error getting final standings, possibly because the season hasn't ended yet"
+            )
+
+        regular_season_standings = self._get_regular_season_standings(
+            year, team_to_manager
+        )
 
         # Populate league with standings information.
         for manager_id, manager in managers.items():
@@ -87,10 +132,14 @@ class SleeperCollector(ICollector):
             )
             league.seasons[year].standings[manager_id] = manager_standing
 
+        # Get info about the draft.
+        draft = self._get_draft(year)
+        league.seasons[year].draft_results = draft
+
         # Get and populate games information.
-        weeks_in_league = self._get_weeks()
+        weeks_in_league = self._get_weeks(year)
         for week in weeks_in_league:
-            week_data = self._get_games_for_week(week, team_to_manager)
+            week_data = self._get_games_for_week(year, week, team_to_manager)
             league.seasons[year].weeks[week] = week_data
 
     def _update_players(self) -> Dict[str, Any]:
@@ -113,17 +162,17 @@ class SleeperCollector(ICollector):
         return players
 
     def _get_final_standings(  # pylint: disable=too-many-locals,too-many-branches
-        self, team_to_manager: Dict[str, List[str]]
+        self,
+        year: int,
+        team_to_manager: Dict[str, List[str]],
     ) -> Dict[str, FinalStanding]:
         # We don't actually care about the final standings, only the winner and runner-up, as nobody
         # takes the other matchups seriously. So since Sleeper doesn't make it easy to get the final
         # standings, we'll only set the winner and runner-up because that's the easier to do.
         playoffs_uri = SleeperCollector._playoffs_endpoint.format(
-            self._config.league_id
+            self.season_to_id[year]
         )
-        logger.info(
-            f"Getting final standings for {self._config.year} from {playoffs_uri}"
-        )
+        logger.info(f"Getting final standings for {year} from {playoffs_uri}")
 
         response = requests.get(playoffs_uri)
         response.raise_for_status()
@@ -167,9 +216,7 @@ class SleeperCollector(ICollector):
             valid_matchups.add(matchup["m"])
             valid_matchups_including_round.add((round_id, matchup["m"]))
 
-        logger.debug(
-            f"The championship round in {self._config.year} is round {championship_round}"
-        )
+        logger.debug(f"The championship round in {year} is round {championship_round}")
 
         # Separately set the championship matchup to ensure it is only set once.
         championship_matchup = None
@@ -185,7 +232,7 @@ class SleeperCollector(ICollector):
             championship_matchup = m_id
 
         logger.debug(
-            f"The championship matchup in {self._config.year} is round {championship_matchup}"
+            f"The championship matchup in {year} is round {championship_matchup}"
         )
 
         final_standings = {}
@@ -210,14 +257,16 @@ class SleeperCollector(ICollector):
         assert (
             final_standings
         ), f"Expected final standings to be populated, got {final_standings}"
-        logger.debug(f"Final standings in {self._config.year}: {final_standings}")
+        logger.debug(f"Final standings in {year}: {final_standings}")
         return final_standings
 
-    def _get_managers(self) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
+    def _get_managers(
+        self, year: int
+    ) -> Tuple[Dict[str, List[str]], Dict[str, Manager]]:
         managers_uri = SleeperCollector._managers_endpoint.format(
-            self._config.league_id
+            self.season_to_id[year]
         )
-        logger.info(f"Getting managers for {self._config.year} from {managers_uri}")
+        logger.info(f"Getting managers for {year} from {managers_uri}")
 
         response = requests.get(managers_uri)
         response.raise_for_status()
@@ -226,10 +275,10 @@ class SleeperCollector(ICollector):
         managers_result = {}
         for manager in managers_data:
             managers_result[manager["user_id"]] = Manager(
-                manager["display_name"], seasons=[self._config.year]
+                manager["display_name"], seasons=[year]
             )
 
-        rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
+        rosters_uri = SleeperCollector._rosters_endpoint.format(self.season_to_id[year])
         response = requests.get(rosters_uri)
         response.raise_for_status()
         rosters_data = response.json()
@@ -241,7 +290,7 @@ class SleeperCollector(ICollector):
 
             team_to_manager[roster["roster_id"]].append(roster["owner_id"])
             logger.debug(
-                f"In {self._config.year}, found manager {managers_result[roster['owner_id']].name} "
+                f"In {year}, found manager {managers_result[roster['owner_id']].name} "
                 f"for team {roster['roster_id']}"
             )
 
@@ -249,12 +298,12 @@ class SleeperCollector(ICollector):
         return team_to_manager, managers_result
 
     def _get_regular_season_standings(
-        self, team_to_manager: Dict[str, List[str]]
+        self,
+        year: int,
+        team_to_manager: Dict[str, List[str]],
     ) -> Dict[str, RegularSeasonStanding]:
-        rosters_uri = SleeperCollector._rosters_endpoint.format(self._config.league_id)
-        logger.info(
-            f"Getting regular season standings for {self._config.year} from {rosters_uri}"
-        )
+        rosters_uri = SleeperCollector._rosters_endpoint.format(self.season_to_id[year])
+        logger.info(f"Getting regular season standings for {year} from {rosters_uri}")
 
         response = requests.get(rosters_uri)
         response.raise_for_status()
@@ -280,11 +329,12 @@ class SleeperCollector(ICollector):
                 ties=roster["settings"]["ties"],
                 losses=roster["settings"]["losses"],
                 points_for=float(
-                    f'{roster["settings"]["fpts"]}.{roster["settings"]["fpts_decimal"]}'
+                    f'{roster["settings"].get("fpts", 0)}.'
+                    f'{str(roster["settings"].get("fpts_decimal", 0)).zfill(2)}'
                 ),
                 points_against=float(
-                    f'{roster["settings"]["fpts_against"]}.'
-                    f'{roster["settings"]["fpts_against_decimal"]}'
+                    f'{roster["settings"].get("fpts_against", 0)}.'
+                    f'{str(roster["settings"].get("fpts_against_decimal", 0)).zfill(2)}'
                 ),
                 roster_id=roster["roster_id"],
             )
@@ -310,13 +360,55 @@ class SleeperCollector(ICollector):
 
         for manager_id, standing in regular_season_standings.items():
             logger.debug(
-                f"Regular season standing for manager {manager_id} in {self._config.year}: "
+                f"Regular season standing for manager {manager_id} in {year}: "
                 f"{standing.to_json()}"
             )
 
         return regular_season_standings
 
-    def _get_weeks(self) -> Set[int]:
+    def _get_draft(self, year: int) -> Draft:
+        drafts_endpoint = SleeperCollector._league_drafts_endpoint.format(
+            self.season_to_id[year]
+        )
+        logger.info(f"Getting drafts for {year} from {drafts_endpoint}")
+
+        drafts_response = requests.get(drafts_endpoint)
+        drafts_response.raise_for_status()
+
+        drafts = []
+
+        # According to API docs there may be multiple drafts for a dynasty league. I don't know what
+        # this means, but ok!
+        for draft in drafts_response.json():
+            draft_id = draft["draft_id"]
+            picks_endpoint = SleeperCollector._draft_picks_endpoint.format(draft_id)
+            logger.info(f"Getting draft for {year} from {picks_endpoint}")
+
+            picks_response = requests.get(picks_endpoint)
+            picks_response.raise_for_status()
+
+            draft_picks = []
+            picks_data = picks_response.json()
+            for pick in picks_data:
+                draft_picks.append(
+                    DraftPick(
+                        round=pick["round"],
+                        round_slot=pick["draft_slot"],
+                        overall_pick=pick["pick_no"],
+                        player_id=pick["player_id"],
+                        player_name=pick["metadata"]["first_name"]
+                        + " "
+                        + pick["metadata"]["last_name"],
+                        player_position=pick["metadata"]["position"],
+                        manager_id=pick["picked_by"],
+                    )
+                )
+
+            drafts.append(draft_picks)
+
+        return Draft(drafts)
+
+    def _get_weeks(self, year: int) -> Set[int]:
         weeks = set()
 
         # The number of weeks may vary as the length of the NFL season has changed.
@@ -324,7 +416,7 @@ class SleeperCollector(ICollector):
         # to introduce bye weeks (...?), let's just count until a large number.
         for week_id in range(1, 32):
             week_uri = SleeperCollector._matchups_endpoint.format(
-                self._config.league_id, week_id
+                self.season_to_id[year], week_id
             )
             logger.info(
                 f"Checking if there are any games in week {week_id} at {week_uri}"
@@ -336,20 +428,18 @@ class SleeperCollector(ICollector):
 
             if week_data:
                 weeks.add(week_id)
-                logger.debug(f"Week {week_id} in season {self._config.year} has games")
+                logger.debug(f"Week {week_id} in season {year} has games")
             else:
-                logger.debug(
-                    f"Week {week_id} in season {self._config.year} has no games"
-                )
+                logger.debug(f"Week {week_id} in season {year} has no games")
 
         logger.debug(f"Weeks with games: {weeks}")
         return weeks
 
     def _get_games_for_week(  # pylint: disable=too-many-locals
-        self, week: int, team_to_manager: Dict[str, List[str]]
+        self, year: int, week: int, team_to_manager: Dict[str, List[str]]
     ) -> Week:
         week_uri = SleeperCollector._matchups_endpoint.format(
-            self._config.league_id, week
+            self.season_to_id[year], week
         )
         logger.info(f"Getting games in week {week} at {week_uri}")
 
@@ -364,7 +454,7 @@ class SleeperCollector(ICollector):
 
             logger.debug(
                 f"Adding {team_week['roster_id']} to matchup {team_week['matchup_id']} week {week} "
-                f"in {self._config.year}"
+                f"in {year}"
             )
 
             roster = set(team_week["players"])
