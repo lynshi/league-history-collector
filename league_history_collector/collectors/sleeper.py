@@ -42,6 +42,7 @@ class SleeperCollector(ICollector):
     _matchups_endpoint: ClassVar[
         str
     ] = "https://api.sleeper.app/v1/league/{}/matchups/{}"
+    _nfl_state_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/state/nfl"
     _league_endpoint: ClassVar[str] = "https://api.sleeper.app/v1/league/{}"
     _playoffs_endpoint: ClassVar[
         str
@@ -71,7 +72,7 @@ class SleeperCollector(ICollector):
             response.raise_for_status()
             response_json = response.json()
 
-            current_season = response_json["season"]
+            current_season = int(response_json["season"])
             self.season_to_id[current_season] = current_league_id
             self.id_to_season[current_league_id] = current_season
 
@@ -97,8 +98,16 @@ class SleeperCollector(ICollector):
             standings={}, weeks={}, league_id=self.season_to_id[year]
         )
 
-        # Collect standings information.
-        final_standings = self._get_final_standings(year, team_to_manager)
+        # # Collect standings information.
+        final_standings = {}
+        try:
+            final_standings = self._get_final_standings(year, team_to_manager)
+        except KeyError:
+            # Final standings won't be available until the season ends, so this is likely ok.
+            logger.opt(exception=True).warning(
+                "Error getting final standings, possibly because the season hasn't ended yet"
+            )
+
         regular_season_standings = self._get_regular_season_standings(
             year, team_to_manager
         )
@@ -310,12 +319,12 @@ class SleeperCollector(ICollector):
                 ties=roster["settings"]["ties"],
                 losses=roster["settings"]["losses"],
                 points_for=float(
-                    f'{roster["settings"]["fpts"]}.'
-                    f'{str(roster["settings"]["fpts_decimal"]).zfill(2)}'
+                    f'{roster["settings"].get("fpts", 0)}.'
+                    f'{str(roster["settings"].get("fpts_decimal", 0)).zfill(2)}'
                 ),
                 points_against=float(
-                    f'{roster["settings"]["fpts_against"]}.'
-                    f'{str(roster["settings"]["fpts_against_decimal"]).zfill(2)}'
+                    f'{roster["settings"].get("fpts_against", 0)}.'
+                    f'{str(roster["settings"].get("fpts_against_decimal", 0)).zfill(2)}'
                 ),
                 roster_id=roster["roster_id"],
             )
