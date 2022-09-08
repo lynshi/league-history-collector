@@ -11,7 +11,7 @@ from league_history_collector.collectors.models import League
 
 def set_games(
     file_name: str, league: League, id_mapper: Callable[[str], str]
-):  # pylint: disable=too-many-locals
+):  # pylint: disable=too-many-locals,too-many-branches
     """Sets games in the league.
 
     :param file_name: Name of the CSV to write data to. If it exists, data is appended.
@@ -94,13 +94,16 @@ def set_games(
         file_name
     )  # Only write headers if the file doesn't exist.
 
-    logger.info(f"Writing games data to {file_name}")
-    with open(file_name, "a+", encoding="utf-8") as outfile:
-        fieldnames = list(game_results[0].keys())
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+    if game_results:
+        logger.info(f"Writing games data to {file_name}")
+        with open(file_name, "a+", encoding="utf-8") as outfile:
+            fieldnames = list(game_results[0].keys())
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
 
-        if write_header:
-            writer.writeheader()
+            if write_header:
+                writer.writeheader()
 
-        for result in game_results:
-            writer.writerow(result)
+            for result in game_results:
+                writer.writerow(result)
+    else:
+        logger.info(f"No games data for {league.id}")

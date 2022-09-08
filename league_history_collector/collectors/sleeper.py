@@ -427,8 +427,18 @@ class SleeperCollector(ICollector):
             week_data = response.json()
 
             if week_data:
-                weeks.add(week_id)
-                logger.debug(f"Week {week_id} in season {year} has games")
+                total_points = 0
+                for roster_result in week_data:
+                    total_points += roster_result["points"]
+
+                if total_points > 0:
+                    weeks.add(week_id)
+                    logger.debug(f"Week {week_id} in season {year} has games")
+                else:
+                    logger.debug(
+                        f"Week {week_id} in season {year} has total points scored for 0, so "
+                        "skipping it under the assumption that it hasn't been played yet."
+                    )
             else:
                 logger.debug(f"Week {week_id} in season {year} has no games")
 

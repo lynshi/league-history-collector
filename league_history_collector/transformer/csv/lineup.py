@@ -83,13 +83,16 @@ def set_lineups(
         file_name
     )  # Only write headers if the file doesn't exist.
 
-    logger.info(f"Writing lineup data to {file_name}")
-    with open(file_name, "a+", encoding="utf-8") as outfile:
-        fieldnames = list(lineup_results[0].keys())
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+    if lineup_results:
+        logger.info(f"Writing lineup data to {file_name}")
+        with open(file_name, "a+", encoding="utf-8") as outfile:
+            fieldnames = list(lineup_results[0].keys())
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
 
-        if write_header:
-            writer.writeheader()
+            if write_header:
+                writer.writeheader()
 
-        for result in lineup_results:
-            writer.writerow(result)
+            for result in lineup_results:
+                writer.writerow(result)
+    else:
+        logger.info(f"No lineup data for {league.id}")
