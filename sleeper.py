@@ -23,7 +23,7 @@ def run_collector(collector_config: SleeperConfiguration):
             league = League(id=collector.season_to_id[year], managers={}, seasons={})
             collector.set_season_data(year, league)
 
-            with open(f"{year}.json", "w") as outfile:
+            with open(f"{collector_config.league_id}-{year}.json", "w") as outfile:
                 json.dump(league.to_dict(), outfile, sort_keys=True, indent=2)
 
 
