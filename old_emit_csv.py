@@ -1,6 +1,5 @@
 """Writes the season data to CSV."""
 
-import argparse
 import csv
 import json
 import os
@@ -8,7 +7,6 @@ import shutil
 
 from loguru import logger
 
-from league_history_collector.collectors import SleeperCollector, SleeperConfiguration
 from league_history_collector.collectors.models import League
 from league_history_collector.transformer.csv.draft import set_drafts
 from league_history_collector.transformer.csv.finish import set_finish
@@ -18,8 +16,12 @@ from league_history_collector.transformer.csv.manager import set_managers
 from league_history_collector.transformer.csv.player import set_players
 from league_history_collector.transformer.csv.season import set_season
 
+# Reverse sorting because the range looks nicer defined in increasing order :)
+# We migrated to Sleeper in 2021.
+SEASONS = sorted(range(2013, 2023), reverse=True)
 
-def main(config: SleeperConfiguration):  # pylint: disable=too-many-locals
+
+def main():  # pylint: disable=too-many-locals
     """Main method for converting league data to CSV."""
 
     file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -30,9 +32,13 @@ def main(config: SleeperConfiguration):  # pylint: disable=too-many-locals
 
     os.makedirs(data_dir)
 
-    collector = SleeperCollector(config)
-    for season in collector.get_seasons():
-        file = os.path.join(file_dir, f"{config.league_id}-{season}.json")
+    with open("manager_mapping.json", encoding="utf-8") as manager_mapping_file:
+        id_mapping_from_file = json.load(manager_mapping_file)
+
+    mapping_from_file = lambda s: id_mapping_from_file.get(s, s)
+
+    for season in SEASONS:
+        file = os.path.join(file_dir, f"{season}.json")
         logger.debug(f"Loading {file}")
         with open(file, encoding="utf-8") as season_data_file:
             league = League.from_dict(json.load(season_data_file))
@@ -40,13 +46,17 @@ def main(config: SleeperConfiguration):  # pylint: disable=too-many-locals
         logger.info(f"Loaded data from {file}")
 
         managers_csv = os.path.join(data_dir, "managers.csv")
-        manager_id_mapper = lambda s: s
+        if season <= 2020:
+            # Remap NFL manager ids to Sleeper ids.
+            manager_id_mapper = mapping_from_file
+        else:
+            manager_id_mapper = lambda s: s
 
         set_managers(managers_csv, league.managers, manager_id_mapper)
 
         players_csv = os.path.join(data_dir, "players.csv")
         set_players(
-            players_csv, league, deduplicate=False
+            players_csv, league, deduplicate=season < 2021
         )  # Remap ids used in NFL Fantasy
 
         seasons_csv = os.path.join(data_dir, "seasons.csv")
@@ -90,13 +100,4 @@ def main(config: SleeperConfiguration):  # pylint: disable=too-many-locals
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Collects fantasy football league history")
-    parser.add_argument(
-        "-c", "--config", help="Path to configuration file", default="sleeper.json"
-    )
-
-    args = parser.parse_args()
-    with open(args.config, encoding="utf-8") as infile:
-        config_dict = json.load(infile)
-
-    main(SleeperConfiguration.from_dict(config_dict))
+    main()
